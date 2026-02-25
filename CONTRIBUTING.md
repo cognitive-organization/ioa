@@ -5,7 +5,7 @@ Thank you for your interest in contributing to IOA. This document covers the gui
 ## Development Setup
 
 ```bash
-git clone https://github.com/paribali/ioa.git
+git clone https://github.com/cognitive-organization/ioa.git
 cd ioa
 pnpm install
 pnpm build

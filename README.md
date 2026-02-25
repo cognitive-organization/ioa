@@ -121,7 +121,7 @@ All passing `ioa validate` at 100%.
 
 ```bash
 # Clone and install
-git clone https://github.com/paribali/ioa.git
+git clone https://github.com/cognitive-organization/ioa.git
 cd ioa
 pnpm install
 
