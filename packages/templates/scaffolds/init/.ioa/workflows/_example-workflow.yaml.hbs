@@ -1,0 +1,28 @@
+apiVersion: ioa.dev/v0.2
+kind: Workflow
+metadata:
+  name: feedback-analysis
+  owner:
+    name: "{{orgName}}"
+    role: workflow-owner
+spec:
+  description: "Analyze incoming user feedback and generate actionable insights"
+  domainsInvolved:
+    - product
+  trigger:
+    event: product.feedback-received
+  steps:
+    - name: analyze
+      agent: product-analyst
+      action: categorize-feedback
+      timeout: "5m"
+      onFailure: abort
+    - name: report
+      agent: product-analyst
+      action: generate-insight-report
+      dependsOn:
+        - analyze
+      timeout: "10m"
+      onFailure: skip
+  timeout: "20m"
+  failurePolicy: abort

@@ -1,11 +1,14 @@
-apiVersion: ioa.dev/v0.1
+apiVersion: ioa.dev/v0.2
 kind: Telemetry
 metadata:
   name: product-feature-released
-  owner: "{{orgName}}"
+  owner:
+    name: "{{orgName}}"
+    role: signal-owner
 spec:
   event: "product.feature_released"
   category: metric
+  severity: info
   description: "Emitted when a new feature is released to production"
   payload:
     type: object
@@ -26,6 +29,20 @@ spec:
   source:
     domain: product
     agent: product-analyst
+  correlationId:
+    required: true
+    format: uuid
+  retention:
+    duration: "180d"
+    archiveAfter: "90d"
   observability:
     dashboard: true
-    alertThreshold: "< 2 releases/month"
+    alertRule:
+      condition:
+        metric: "events.count"
+        operator: lt
+        value: 2
+        window: "30d"
+      severity: warning
+      channels:
+        - slack

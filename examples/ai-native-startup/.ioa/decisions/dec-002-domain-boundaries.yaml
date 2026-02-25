@@ -1,21 +1,31 @@
-apiVersion: ioa.dev/v0.1
+apiVersion: ioa.dev/v0.2
 kind: Decision
 metadata:
   name: dec-002-domain-boundaries
-  owner: "Acme AI"
+  owner:
+    name: "Acme AI"
+    role: decision-maker
 spec:
   id: "DEC-002"
   status: accepted
   domain: product
   date: "2026-01-20"
+  reviewDate: "2026-04-20"
   deciders:
-    - CEO
-    - CTO
-    - Product Lead
+    - name: CEO
+      role: executive-leadership
+    - name: CTO
+      role: technical-leadership
+    - name: Product Lead
+      role: product-leadership
+  initiatedBy:
+    type: human
+    name: CEO
   context: "We need to define clear domain boundaries to avoid overlapping responsibilities and ensure each domain has explicit data ownership and event contracts."
   options:
     - name: "Functional boundaries"
       description: "Split by business function: product, growth, analytics"
+      estimatedCost: "Low — aligns with existing team structure"
       pros:
         - Clear ownership
         - Aligns with team structure
@@ -25,6 +35,7 @@ spec:
         - Cross-functional features need coordination
     - name: "Product-line boundaries"
       description: "Split by product/service offering"
+      estimatedCost: "High — requires restructuring teams and duplicating shared services"
       pros:
         - End-to-end ownership
         - Independent scaling
@@ -33,6 +44,16 @@ spec:
         - Harder to share data
   chosen: "Functional boundaries"
   rationale: "At our current scale, functional boundaries provide the clearest ownership model. Each domain maps to a team with distinct KPIs. Cross-domain coordination happens through explicit event contracts."
+  assumptions:
+    - id: A1
+      statement: "Current team structure maps cleanly to functional domains"
+      status: valid
+    - id: A2
+      statement: "Event contracts are sufficient for cross-domain coordination at current scale"
+      status: valid
+    - id: A3
+      statement: "Domain boundaries will not need restructuring within the next 6 months"
+      status: untested
   kpiImpact:
     - kpi: feature-velocity
       expected: "Clearer ownership reduces coordination overhead"

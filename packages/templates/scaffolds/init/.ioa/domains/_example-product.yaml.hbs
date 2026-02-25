@@ -1,21 +1,32 @@
-apiVersion: ioa.dev/v0.1
+apiVersion: ioa.dev/v0.2
 kind: Domain
 metadata:
   name: product
-  owner: "{{orgName}}"
+  owner:
+    name: "{{orgName}}"
+    role: domain-lead
 spec:
   purpose: "Core product development and feature delivery"
   kpis:
     - name: feature-velocity
-      target: "10 features/quarter"
-      unit: features
+      target:
+        operator: gte
+        value: 10
+        unit: features/quarter
+      window: "1q"
     - name: user-satisfaction
-      target: ">4.5"
-      unit: NPS
+      target:
+        operator: gt
+        value: 4.5
+        unit: NPS
+      window: "30d"
   dataOwnership:
-    - product-catalog
-    - feature-flags
-    - user-feedback
+    - name: product-catalog
+      classification: internal
+    - name: user-feedback
+      classification: confidential
+    - name: feature-flags
+      classification: internal
   events:
     produces:
       - product.feature-released

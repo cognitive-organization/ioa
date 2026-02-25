@@ -8,6 +8,7 @@ import agentSchema from "../agent.schema.json";
 import decisionSchema from "../decision.schema.json";
 import telemetrySchema from "../telemetry.schema.json";
 import governanceSchema from "../governance.schema.json";
+import workflowSchema from "../workflow.schema.json";
 import configSchema from "../config.schema.json";
 
 // ---------------------------------------------------------------------------
@@ -20,6 +21,7 @@ const SCHEMAS: Record<string, object> = {
   Decision: decisionSchema,
   Telemetry: telemetrySchema,
   Governance: governanceSchema,
+  Workflow: workflowSchema,
   Config: configSchema,
 };
 

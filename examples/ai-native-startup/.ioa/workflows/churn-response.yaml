@@ -1,0 +1,56 @@
+apiVersion: ioa.dev/v0.2
+kind: Workflow
+metadata:
+  name: churn-response
+  owner:
+    name: "Acme AI"
+    role: workflow-owner
+spec:
+  description: "Detect churn risk, analyze context, and trigger retention campaign"
+  domainsInvolved:
+    - growth
+    - product
+    - analytics
+  trigger:
+    event: growth.churn-signal
+    condition: "payload.riskLevel >= 'high'"
+  steps:
+    - name: classify
+      agent: growth-optimizer
+      action: classify-churn-risk
+      timeout: "5m"
+      retryPolicy:
+        maxRetries: 2
+        backoff: "30s"
+      onFailure: abort
+    - name: analyze
+      agent: data-pipeline
+      action: compile-churn-context
+      dependsOn:
+        - classify
+      timeout: "3m"
+      onFailure: skip
+    - name: offer
+      agent: product-analyst
+      action: generate-retention-offer
+      dependsOn:
+        - classify
+        - analyze
+      timeout: "10m"
+      onFailure: abort
+    - name: deliver
+      agent: growth-optimizer
+      action: deliver-offer
+      dependsOn:
+        - offer
+      timeout: "2m"
+      onFailure: compensate
+  compensation:
+    - step: deliver
+      action: cancel-pending-offer
+      agent: growth-optimizer
+    - step: offer
+      action: log-missed-opportunity
+      agent: insight-reporter
+  timeout: "30m"
+  failurePolicy: compensate

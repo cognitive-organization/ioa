@@ -24,7 +24,7 @@ export const initCommand = new Command("init")
       projectName,
       orgName,
       orgDomain,
-      doctrineVersion: "0.1",
+      doctrineVersion: "0.2",
     });
 
     const ioaDir = join(process.cwd(), ".ioa");

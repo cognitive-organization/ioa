@@ -1,21 +1,36 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://ioa.dev/schemas/v0.1/domain.json",
+  "$id": "https://ioa.dev/schemas/v0.2/domain.json",
   "title": "IOA Domain",
   "description": "Defines an organizational domain with boundaries, KPIs, and event contracts",
   "type": "object",
   "required": ["apiVersion", "kind", "metadata", "spec"],
   "properties": {
-    "apiVersion": { "const": "ioa.dev/v0.1" },
+    "apiVersion": { "enum": ["ioa.dev/v0.1", "ioa.dev/v0.2"] },
     "kind": { "const": "Domain" },
     "metadata": {
       "type": "object",
       "required": ["name"],
       "properties": {
         "name": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
-        "owner": { "type": "string" },
+        "owner": {
+          "oneOf": [
+            { "type": "string" },
+            {
+              "type": "object",
+              "required": ["name"],
+              "properties": {
+                "name": { "type": "string" },
+                "role": { "type": "string" }
+              }
+            }
+          ]
+        },
         "labels": { "type": "object", "additionalProperties": { "type": "string" } },
-        "annotations": { "type": "object", "additionalProperties": { "type": "string" } }
+        "annotations": { "type": "object", "additionalProperties": { "type": "string" } },
+        "version": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
       }
     },
     "spec": {
@@ -30,14 +45,43 @@
             "required": ["name", "target"],
             "properties": {
               "name": { "type": "string" },
-              "target": { "type": "string" },
-              "unit": { "type": "string" }
+              "target": {
+                "oneOf": [
+                  { "type": "string" },
+                  {
+                    "type": "object",
+                    "required": ["operator", "value"],
+                    "properties": {
+                      "operator": { "enum": ["gt", "lt", "eq", "gte", "lte"] },
+                      "value": { "type": "number" },
+                      "unit": { "type": "string" }
+                    }
+                  }
+                ]
+              },
+              "unit": { "type": "string" },
+              "window": { "type": "string" }
             }
           }
         },
         "dataOwnership": {
-          "type": "array",
-          "items": { "type": "string" }
+          "oneOf": [
+            {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["name", "classification"],
+                "properties": {
+                  "name": { "type": "string" },
+                  "classification": { "enum": ["public", "internal", "confidential", "restricted"] }
+                }
+              }
+            }
+          ]
         },
         "events": {
           "type": "object",
@@ -51,6 +95,47 @@
           "properties": {
             "includes": { "type": "array", "items": { "type": "string" } },
             "excludes": { "type": "array", "items": { "type": "string" } }
+          }
+        },
+        "budgetRef": { "type": "string" },
+        "securityPolicyRef": { "type": "string" },
+        "agents": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "status": {
+      "type": "object",
+      "properties": {
+        "health": { "enum": ["healthy", "degraded", "critical"] },
+        "costToDate": {
+          "type": "object",
+          "properties": {
+            "value": { "type": "number" },
+            "currency": { "type": "string" }
+          }
+        },
+        "decisionVelocity": {
+          "type": "object",
+          "properties": {
+            "decisionsPerWeek": { "type": "number" },
+            "avgLeadTimeDays": { "type": "number" }
+          }
+        },
+        "cognitiveLoadScore": { "type": "number" },
+        "activeAgents": { "type": "number" },
+        "activeIncidents": { "type": "number" },
+        "lastEvaluation": { "type": "string", "format": "date-time" },
+        "conditions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["type", "status"],
+            "properties": {
+              "type": { "type": "string" },
+              "status": { "enum": ["True", "False", "Unknown"] },
+              "reason": { "type": "string" },
+              "message": { "type": "string" },
+              "lastTransitionTime": { "type": "string", "format": "date-time" }
+            }
           }
         }
       }

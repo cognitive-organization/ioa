@@ -1,19 +1,31 @@
-apiVersion: ioa.dev/v0.1
+apiVersion: ioa.dev/v0.2
 kind: Agent
 metadata:
   name: product-analyst
-  owner: "{{orgName}}"
+  owner:
+    name: "{{orgName}}"
+    role: agent-owner
   labels:
     tier: "core"
 spec:
   domain: product
   type: advisory
+  role: analytical
   purpose: "Analyze user feedback and surface actionable insights for product decisions"
+  model:
+    provider: anthropic
+    name: claude-sonnet-4
+    version: "2025-05-14"
   capabilities:
-    - Sentiment analysis on user feedback
-    - Feature request clustering
-    - Competitive analysis summaries
-    - Weekly product insight reports
+    - name: sentiment-analysis
+      type: analysis
+      description: "Sentiment analysis on user feedback"
+    - name: feature-clustering
+      type: classification
+      description: "Feature request clustering and prioritization"
+    - name: insight-reports
+      type: generation
+      description: "Weekly product insight reports"
   constraints:
     - Cannot make product decisions autonomously
     - Must cite data sources in all recommendations
@@ -30,3 +42,6 @@ spec:
   memory:
     type: persistent
     retention: "90d"
+    scope: domain
+  schedule:
+    type: event-driven

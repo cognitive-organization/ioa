@@ -1,21 +1,36 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://ioa.dev/schemas/v0.1/governance.json",
+  "$id": "https://ioa.dev/schemas/v0.2/governance.json",
   "title": "IOA Governance",
   "description": "Defines governance policies including access control, audit, failure modes, and human override channels",
   "type": "object",
   "required": ["apiVersion", "kind", "metadata", "spec"],
   "properties": {
-    "apiVersion": { "const": "ioa.dev/v0.1" },
+    "apiVersion": { "enum": ["ioa.dev/v0.1", "ioa.dev/v0.2"] },
     "kind": { "const": "Governance" },
     "metadata": {
       "type": "object",
       "required": ["name"],
       "properties": {
         "name": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
-        "owner": { "type": "string" },
+        "owner": {
+          "oneOf": [
+            { "type": "string" },
+            {
+              "type": "object",
+              "required": ["name"],
+              "properties": {
+                "name": { "type": "string" },
+                "role": { "type": "string" }
+              }
+            }
+          ]
+        },
         "labels": { "type": "object", "additionalProperties": { "type": "string" } },
-        "annotations": { "type": "object", "additionalProperties": { "type": "string" } }
+        "annotations": { "type": "object", "additionalProperties": { "type": "string" } },
+        "version": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
       }
     },
     "spec": {
@@ -23,6 +38,7 @@
       "required": ["domain"],
       "properties": {
         "domain": { "type": "string" },
+        "extends": { "type": "string" },
         "accessControl": {
           "type": "object",
           "properties": {
@@ -61,6 +77,32 @@
             }
           }
         },
+        "escalation": {
+          "type": "object",
+          "properties": {
+            "paths": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["level", "role"],
+                "properties": {
+                  "level": { "type": "number" },
+                  "role": { "type": "string" },
+                  "channel": { "type": "string" },
+                  "timeout": { "type": "string" }
+                }
+              }
+            },
+            "defaultPath": { "type": "string" }
+          }
+        },
+        "compliance": {
+          "type": "object",
+          "properties": {
+            "standards": { "type": "array", "items": { "type": "string" } },
+            "requirements": { "type": "array", "items": { "type": "string" } }
+          }
+        },
         "failureModes": {
           "type": "array",
           "items": {
@@ -82,6 +124,29 @@
               "items": { "type": "string" }
             },
             "maxResponseTime": { "type": "string" }
+          }
+        }
+      }
+    },
+    "status": {
+      "type": "object",
+      "properties": {
+        "activePolicies": { "type": "number" },
+        "overrideFrequency": { "type": "number" },
+        "escalationRate": { "type": "number" },
+        "complianceStatus": { "enum": ["compliant", "non-compliant", "under-review"] },
+        "conditions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["type", "status"],
+            "properties": {
+              "type": { "type": "string" },
+              "status": { "enum": ["True", "False", "Unknown"] },
+              "reason": { "type": "string" },
+              "message": { "type": "string" },
+              "lastTransitionTime": { "type": "string", "format": "date-time" }
+            }
           }
         }
       }

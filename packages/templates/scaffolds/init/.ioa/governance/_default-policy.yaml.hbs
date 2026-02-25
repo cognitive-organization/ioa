@@ -1,8 +1,10 @@
-apiVersion: ioa.dev/v0.1
+apiVersion: ioa.dev/v0.2
 kind: Governance
 metadata:
   name: default-policy
-  owner: "{{orgName}}"
+  owner:
+    name: "{{orgName}}"
+    role: governance-owner
 spec:
   domain: product
   accessControl:
@@ -24,10 +26,21 @@ spec:
   promptVersioning:
     enabled: true
     repository: "prompts/"
-  audit:
-    enabled: true
-    retention: "365d"
-    level: full
+  escalation:
+    paths:
+      - level: 1
+        role: domain-lead
+        channel: slack
+        timeout: "15m"
+      - level: 2
+        role: vp-engineering
+        channel: pagerduty
+        timeout: "30m"
+    defaultPath: "level-1"
+  compliance:
+    standards: []
+    requirements:
+      - "All agent actions must be auditable"
   failureModes:
     - scenario: "Agent unresponsive"
       response: "Fallback to manual process"

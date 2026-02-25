@@ -1,23 +1,32 @@
-apiVersion: ioa.dev/v0.1
+apiVersion: ioa.dev/v0.2
 kind: Domain
 metadata:
   name: analytics
-  owner: "Acme AI"
+  owner:
+    name: "Acme AI"
+    role: domain-owner
   labels:
     tier: support
 spec:
   purpose: "Data collection, analysis, and insight generation across all domains"
   kpis:
     - name: data-freshness
-      target: "<1h"
-      unit: hours
+      target:
+        operator: lt
+        value: 1
+        unit: hours
     - name: insight-accuracy
-      target: ">90%"
-      unit: percent
+      target:
+        operator: gt
+        value: 90
+        unit: percent
   dataOwnership:
-    - event-streams
-    - dashboards
-    - data-warehouse
+    - name: event-streams
+      classification: internal
+    - name: dashboards
+      classification: internal
+    - name: data-warehouse
+      classification: internal
   events:
     produces:
       - analytics.user-behavior

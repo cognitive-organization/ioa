@@ -1,6 +1,6 @@
 {
   "name": "@ioa/doctrine",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "IOA Doctrine — 12 principles for AI-native organization design",
   "type": "module",
   "main": "dist/index.js",

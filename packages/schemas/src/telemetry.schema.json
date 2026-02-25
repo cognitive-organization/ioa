@@ -1,21 +1,36 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://ioa.dev/schemas/v0.1/telemetry.json",
+  "$id": "https://ioa.dev/schemas/v0.2/telemetry.json",
   "title": "IOA Telemetry",
   "description": "Defines a telemetry event contract with payload schema, metrics, and observability settings",
   "type": "object",
   "required": ["apiVersion", "kind", "metadata", "spec"],
   "properties": {
-    "apiVersion": { "const": "ioa.dev/v0.1" },
+    "apiVersion": { "enum": ["ioa.dev/v0.1", "ioa.dev/v0.2"] },
     "kind": { "const": "Telemetry" },
     "metadata": {
       "type": "object",
       "required": ["name"],
       "properties": {
         "name": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
-        "owner": { "type": "string" },
+        "owner": {
+          "oneOf": [
+            { "type": "string" },
+            {
+              "type": "object",
+              "required": ["name"],
+              "properties": {
+                "name": { "type": "string" },
+                "role": { "type": "string" }
+              }
+            }
+          ]
+        },
         "labels": { "type": "object", "additionalProperties": { "type": "string" } },
-        "annotations": { "type": "object", "additionalProperties": { "type": "string" } }
+        "annotations": { "type": "object", "additionalProperties": { "type": "string" } },
+        "version": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
       }
     },
     "spec": {
@@ -29,7 +44,11 @@
         },
         "category": {
           "type": "string",
-          "enum": ["metric", "log", "trace", "alert"]
+          "enum": ["metric", "log", "trace", "alert", "audit"]
+        },
+        "severity": {
+          "type": "string",
+          "enum": ["info", "warning", "error", "critical"]
         },
         "description": { "type": "string" },
         "payload": {
@@ -39,6 +58,20 @@
         "metricsImpacted": {
           "type": "array",
           "items": { "type": "string" }
+        },
+        "correlationId": {
+          "type": "object",
+          "properties": {
+            "required": { "type": "boolean" },
+            "format": { "enum": ["uuid", "ulid", "custom"] }
+          }
+        },
+        "retention": {
+          "type": "object",
+          "properties": {
+            "duration": { "type": "string" },
+            "archiveAfter": { "type": "string" }
+          }
         },
         "source": {
           "type": "object",
@@ -51,7 +84,46 @@
           "type": "object",
           "properties": {
             "dashboard": { "type": "boolean" },
-            "alertThreshold": { "type": "string" }
+            "alertThreshold": { "type": "string" },
+            "alertRule": {
+              "type": "object",
+              "properties": {
+                "condition": {
+                  "type": "object",
+                  "properties": {
+                    "metric": { "type": "string" },
+                    "operator": { "enum": ["gt", "lt", "eq", "gte", "lte"] },
+                    "value": { "type": "number" },
+                    "window": { "type": "string" }
+                  }
+                },
+                "severity": { "enum": ["info", "warning", "error", "critical"] },
+                "channels": { "type": "array", "items": { "type": "string" } }
+              }
+            }
+          }
+        }
+      }
+    },
+    "status": {
+      "type": "object",
+      "properties": {
+        "eventRate": { "type": "number" },
+        "lastEmitted": { "type": "string", "format": "date-time" },
+        "errorRate": { "type": "number" },
+        "avgPayloadSize": { "type": "number" },
+        "conditions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["type", "status"],
+            "properties": {
+              "type": { "type": "string" },
+              "status": { "enum": ["True", "False", "Unknown"] },
+              "reason": { "type": "string" },
+              "message": { "type": "string" },
+              "lastTransitionTime": { "type": "string", "format": "date-time" }
+            }
           }
         }
       }

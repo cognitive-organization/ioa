@@ -1,19 +1,34 @@
-apiVersion: ioa.dev/v0.1
+apiVersion: ioa.dev/v0.2
 kind: Agent
 metadata:
   name: data-pipeline
-  owner: "Acme AI"
+  owner:
+    name: "Acme AI"
+    role: agent-owner
   labels:
     tier: infrastructure
 spec:
   domain: analytics
   type: autonomous
+  role: tactical
   purpose: "Collect, transform, and route event data across domains"
+  model:
+    provider: anthropic
+    name: claude-sonnet-4
+    version: "2025-05-14"
   capabilities:
-    - Event stream ingestion
-    - Data transformation and enrichment
-    - Schema validation on incoming events
-    - Anomaly detection on data quality
+    - name: event-ingestion
+      type: monitoring
+      description: "Event stream ingestion"
+    - name: data-transformation
+      type: generation
+      description: "Data transformation and enrichment"
+    - name: schema-validation
+      type: classification
+      description: "Schema validation on incoming events"
+    - name: anomaly-detection
+      type: monitoring
+      description: "Anomaly detection on data quality"
   constraints:
     - Must process events within 5 minutes
     - Cannot drop events — dead-letter queue required
@@ -29,4 +44,7 @@ spec:
     auditLevel: full
   memory:
     type: shared
+    scope: organization
     retention: "30d"
+  schedule:
+    type: continuous

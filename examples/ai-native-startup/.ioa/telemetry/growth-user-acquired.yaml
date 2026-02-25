@@ -1,12 +1,18 @@
-apiVersion: ioa.dev/v0.1
+apiVersion: ioa.dev/v0.2
 kind: Telemetry
 metadata:
   name: growth-user-acquired
-  owner: "Acme AI"
+  owner:
+    name: "Acme AI"
+    role: signal-owner
 spec:
   event: "growth.user_acquired"
   category: metric
+  severity: info
   description: "Emitted when a new user completes signup and activation"
+  correlationId:
+    required: true
+    format: uuid
   payload:
     type: object
     properties:
@@ -28,6 +34,18 @@ spec:
   source:
     domain: growth
     agent: growth-optimizer
+  retention:
+    duration: "180d"
+    archiveAfter: "90d"
   observability:
     dashboard: true
     alertThreshold: "< 10 signups/day"
+    alertRule:
+      condition:
+        metric: events.count
+        operator: lt
+        value: 10
+        window: "1d"
+      severity: warning
+      channels:
+        - slack

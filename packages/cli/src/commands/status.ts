@@ -44,6 +44,7 @@ export const statusCommand = new Command("status")
     const decisions = loadNames(join(ioaPath, "decisions"));
     const telemetry = loadNames(join(ioaPath, "telemetry"));
     const governance = loadNames(join(ioaPath, "governance"));
+    const workflows = loadNames(join(ioaPath, "workflows"));
 
     const line = "─".repeat(50);
 
@@ -72,10 +73,11 @@ export const statusCommand = new Command("status")
     printResource("📋", "Decisions", decisions);
     printResource("📊", "Telemetry", telemetry);
     printResource("🛡️ ", "Governance", governance);
+    printResource("⚡", "Workflows", workflows);
 
     console.log(pc.bold(pc.cyan("└" + line + "┘")));
 
-    const total = domains.length + agents.length + decisions.length + telemetry.length + governance.length;
+    const total = domains.length + agents.length + decisions.length + telemetry.length + governance.length + workflows.length;
     console.log(pc.dim(`\n  ${total} total resources defined.\n`));
     console.log(`  Run ${pc.cyan("ioa validate")} to check compliance.\n`);
   });

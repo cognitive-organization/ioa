@@ -1,19 +1,34 @@
-apiVersion: ioa.dev/v0.1
+apiVersion: ioa.dev/v0.2
 kind: Agent
 metadata:
   name: insight-reporter
-  owner: "Acme AI"
+  owner:
+    name: "Acme AI"
+    role: agent-owner
   labels:
     tier: support
 spec:
   domain: analytics
   type: reactive
+  role: observer
   purpose: "Generate and distribute insight reports when triggered by significant data changes"
+  model:
+    provider: anthropic
+    name: claude-sonnet-4
+    version: "2025-05-14"
   capabilities:
-    - Automated report generation
-    - Cross-domain metric correlation
-    - Executive summary creation
-    - Slack/email distribution
+    - name: report-generation
+      type: generation
+      description: "Automated report generation"
+    - name: metric-correlation
+      type: analysis
+      description: "Cross-domain metric correlation"
+    - name: executive-summary
+      type: generation
+      description: "Executive summary creation"
+    - name: report-distribution
+      type: orchestration
+      description: "Slack/email distribution"
   constraints:
     - Reports must be generated within 10 minutes of trigger
     - Cannot send external communications without review
@@ -27,4 +42,7 @@ spec:
     auditLevel: summary
   memory:
     type: session
+    scope: domain
     retention: "7d"
+  schedule:
+    type: event-driven

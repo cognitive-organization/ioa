@@ -55,6 +55,7 @@ export const validateCommand = new Command("validate")
       decisions: "Decision",
       telemetry: "Telemetry",
       governance: "Governance",
+      workflows: "Workflow",
     };
 
     // Load and validate all resources
@@ -109,6 +110,31 @@ export const validateCommand = new Command("validate")
         crossRefErrors.push(
           `Telemetry "${data.metadata?.name}" references unknown agent "${data.spec.source.agent}"`
         );
+      }
+    }
+
+    // Check workflow references valid agents and domains
+    const workflowFiles = loadYamlFiles(join(ioaPath, "workflows"));
+    for (const { path, data } of workflowFiles) {
+      // Check steps reference valid agents
+      if (data?.spec?.steps) {
+        for (const step of data.spec.steps) {
+          if (step.agent && !agentNames.has(step.agent)) {
+            crossRefErrors.push(
+              `Workflow "${data.metadata?.name}" step "${step.name || step.id}" references unknown agent "${step.agent}"`
+            );
+          }
+        }
+      }
+      // Check domainsInvolved reference valid domains
+      if (data?.spec?.domainsInvolved) {
+        for (const domain of data.spec.domainsInvolved) {
+          if (!domainNames.has(domain)) {
+            crossRefErrors.push(
+              `Workflow "${data.metadata?.name}" references unknown domain "${domain}" in domainsInvolved`
+            );
+          }
+        }
       }
     }
 

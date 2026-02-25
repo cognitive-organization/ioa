@@ -1,0 +1,130 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://ioa.dev/schemas/v0.2/workflow.json",
+  "title": "IOA Workflow",
+  "description": "Multi-agent, cross-domain orchestration modeled as a DAG",
+  "type": "object",
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": { "enum": ["ioa.dev/v0.2"] },
+    "kind": { "const": "Workflow" },
+    "metadata": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+        "owner": {
+          "oneOf": [
+            { "type": "string" },
+            {
+              "type": "object",
+              "required": ["name"],
+              "properties": {
+                "name": { "type": "string" },
+                "role": { "type": "string" }
+              }
+            }
+          ]
+        },
+        "labels": { "type": "object", "additionalProperties": { "type": "string" } },
+        "annotations": { "type": "object", "additionalProperties": { "type": "string" } },
+        "version": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "spec": {
+      "type": "object",
+      "required": ["description", "domainsInvolved", "steps"],
+      "properties": {
+        "description": { "type": "string" },
+        "domainsInvolved": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 1
+        },
+        "trigger": {
+          "type": "object",
+          "properties": {
+            "event": { "type": "string" },
+            "condition": { "type": "string" },
+            "schedule": { "type": "string" }
+          }
+        },
+        "steps": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "agent", "action"],
+            "properties": {
+              "name": { "type": "string" },
+              "agent": { "type": "string" },
+              "action": { "type": "string" },
+              "dependsOn": { "type": "array", "items": { "type": "string" } },
+              "timeout": { "type": "string" },
+              "retryPolicy": {
+                "type": "object",
+                "properties": {
+                  "maxRetries": { "type": "integer" },
+                  "backoff": { "type": "string" }
+                }
+              },
+              "onFailure": { "enum": ["abort", "skip", "compensate"] }
+            }
+          },
+          "minItems": 1
+        },
+        "compensation": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["step", "action", "agent"],
+            "properties": {
+              "step": { "type": "string" },
+              "action": { "type": "string" },
+              "agent": { "type": "string" }
+            }
+          }
+        },
+        "timeout": { "type": "string" },
+        "failurePolicy": { "enum": ["compensate", "retry", "abort"] }
+      }
+    },
+    "status": {
+      "type": "object",
+      "properties": {
+        "state": { "enum": ["idle", "queued", "executing", "blocked", "completed", "failed", "compensating"] },
+        "currentStep": { "type": "string" },
+        "completedSteps": { "type": "array", "items": { "type": "string" } },
+        "failedSteps": { "type": "array", "items": { "type": "string" } },
+        "startedAt": { "type": "string", "format": "date-time" },
+        "completedAt": { "type": ["string", "null"], "format": "date-time" },
+        "retries": { "type": "integer" },
+        "latency": { "type": "string" },
+        "costAccumulated": {
+          "type": "object",
+          "properties": {
+            "tokens": { "type": "integer" },
+            "cost": { "type": "number" },
+            "currency": { "type": "string" }
+          }
+        },
+        "conditions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["type", "status"],
+            "properties": {
+              "type": { "type": "string" },
+              "status": { "enum": ["True", "False", "Unknown"] },
+              "reason": { "type": "string" },
+              "message": { "type": "string" },
+              "lastTransitionTime": { "type": "string", "format": "date-time" }
+            }
+          }
+        }
+      }
+    }
+  },
+  "additionalProperties": false
+}

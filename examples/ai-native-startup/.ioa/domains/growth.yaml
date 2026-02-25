@@ -1,26 +1,37 @@
-apiVersion: ioa.dev/v0.1
+apiVersion: ioa.dev/v0.2
 kind: Domain
 metadata:
   name: growth
-  owner: "Acme AI"
+  owner:
+    name: "Acme AI"
+    role: domain-owner
   labels:
     tier: core
 spec:
   purpose: "User acquisition, retention, and revenue growth"
   kpis:
     - name: monthly-active-users
-      target: "10000"
-      unit: users
+      target:
+        operator: gte
+        value: 10000
+        unit: users
     - name: churn-rate
-      target: "<5%"
-      unit: percent
+      target:
+        operator: lt
+        value: 5
+        unit: percent
     - name: mrr
-      target: ">50000"
-      unit: USD
+      target:
+        operator: gt
+        value: 50000
+        unit: USD
   dataOwnership:
-    - user-segments
-    - campaign-data
-    - conversion-funnels
+    - name: user-segments
+      classification: confidential
+    - name: campaign-data
+      classification: internal
+    - name: conversion-funnels
+      classification: internal
   events:
     produces:
       - growth.user-acquired

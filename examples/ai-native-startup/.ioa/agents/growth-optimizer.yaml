@@ -1,19 +1,34 @@
-apiVersion: ioa.dev/v0.1
+apiVersion: ioa.dev/v0.2
 kind: Agent
 metadata:
   name: growth-optimizer
-  owner: "Acme AI"
+  owner:
+    name: "Acme AI"
+    role: agent-owner
   labels:
     tier: core
 spec:
   domain: growth
   type: supervised
+  role: tactical
   purpose: "Optimize user acquisition and retention through data-driven campaign management"
+  model:
+    provider: anthropic
+    name: claude-sonnet-4
+    version: "2025-05-14"
   capabilities:
-    - A/B test design and analysis
-    - Campaign performance forecasting
-    - Churn prediction modeling
-    - Onboarding flow optimization
+    - name: ab-test-analysis
+      type: analysis
+      description: "A/B test design and analysis"
+    - name: campaign-forecasting
+      type: generation
+      description: "Campaign performance forecasting"
+    - name: churn-prediction
+      type: classification
+      description: "Churn prediction modeling"
+    - name: onboarding-optimization
+      type: analysis
+      description: "Onboarding flow optimization"
   constraints:
     - Campaign spend must be approved by growth lead
     - Cannot modify pricing without explicit approval
@@ -29,4 +44,7 @@ spec:
     auditLevel: full
   memory:
     type: persistent
+    scope: domain
     retention: "180d"
+  schedule:
+    type: event-driven

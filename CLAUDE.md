@@ -12,14 +12,23 @@
 - `pnpm --filter @ioa/cli dev` — dev mode for CLI
 
 ## Architecture Decisions
-- Kubernetes-style resource model: apiVersion/kind/metadata/spec
+- Kubernetes-style resource model: apiVersion/kind/metadata/spec/status
 - YAML for user files, JSON Schema for validation
 - tsup for building TypeScript packages
 - Handlebars for scaffolding templates
 - Doctrine is versioned independently under content/v{major}.{minor}/
+- v0.2 "Runtime Architecture": spec (desired state) + status (runtime state)
+- Backward compatible: schemas accept both v0.1 and v0.2 apiVersion
 
 ## Conventions
-- All YAML resources use `apiVersion: ioa.dev/v0.1`
-- Schema IDs follow pattern: `https://ioa.dev/schemas/v0.1/{kind}.json`
+- All YAML resources use `apiVersion: ioa.dev/v0.2` (v0.1 still accepted)
+- Schema IDs follow pattern: `https://ioa.dev/schemas/v0.2/{kind}.json`
 - CLI binary is `ioa` (from @ioa/cli)
-- Cross-reference validation: agents reference domains, telemetry references agents
+- Cross-reference validation: agents→domains, telemetry→agents, workflows→agents+domains
+- 6 resource kinds: Domain, Agent, Decision, Telemetry, Governance, Workflow
+
+## CLI Commands
+- `ioa init` — scaffold .ioa/ with v0.2 templates
+- `ioa validate` — validate YAML against schemas + cross-references
+- `ioa status` — dashboard of resources in terminal
+- `ioa migrate` — migrate v0.1 resources to v0.2 format (supports --dry-run)

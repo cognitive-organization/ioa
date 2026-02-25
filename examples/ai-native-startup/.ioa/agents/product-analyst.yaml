@@ -1,20 +1,37 @@
-apiVersion: ioa.dev/v0.1
+apiVersion: ioa.dev/v0.2
 kind: Agent
 metadata:
   name: product-analyst
-  owner: "Acme AI"
+  owner:
+    name: "Acme AI"
+    role: agent-owner
   labels:
     tier: core
 spec:
   domain: product
   type: advisory
+  role: analytical
   purpose: "Analyze user feedback and market signals to surface actionable product insights"
+  model:
+    provider: anthropic
+    name: claude-sonnet-4
+    version: "2025-05-14"
   capabilities:
-    - Sentiment analysis on user feedback
-    - Feature request clustering and prioritization
-    - Competitive landscape monitoring
-    - Weekly product insight reports
-    - Roadmap impact analysis
+    - name: sentiment-analysis
+      type: analysis
+      description: "Sentiment analysis on user feedback"
+    - name: feature-clustering
+      type: classification
+      description: "Feature request clustering and prioritization"
+    - name: competitive-monitoring
+      type: monitoring
+      description: "Competitive landscape monitoring"
+    - name: insight-reporting
+      type: generation
+      description: "Weekly product insight reports"
+    - name: roadmap-impact
+      type: analysis
+      description: "Roadmap impact analysis"
   constraints:
     - Cannot make product decisions autonomously
     - Must cite data sources in all recommendations
@@ -31,4 +48,7 @@ spec:
     auditLevel: summary
   memory:
     type: persistent
+    scope: domain
     retention: "90d"
+  schedule:
+    type: event-driven

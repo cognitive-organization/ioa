@@ -1,21 +1,36 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://ioa.dev/schemas/v0.1/agent.json",
+  "$id": "https://ioa.dev/schemas/v0.2/agent.json",
   "title": "IOA Agent",
   "description": "Defines an intelligent agent with capabilities, constraints, and governance rules",
   "type": "object",
   "required": ["apiVersion", "kind", "metadata", "spec"],
   "properties": {
-    "apiVersion": { "const": "ioa.dev/v0.1" },
+    "apiVersion": { "enum": ["ioa.dev/v0.1", "ioa.dev/v0.2"] },
     "kind": { "const": "Agent" },
     "metadata": {
       "type": "object",
       "required": ["name"],
       "properties": {
         "name": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
-        "owner": { "type": "string" },
+        "owner": {
+          "oneOf": [
+            { "type": "string" },
+            {
+              "type": "object",
+              "required": ["name"],
+              "properties": {
+                "name": { "type": "string" },
+                "role": { "type": "string" }
+              }
+            }
+          ]
+        },
         "labels": { "type": "object", "additionalProperties": { "type": "string" } },
-        "annotations": { "type": "object", "additionalProperties": { "type": "string" } }
+        "annotations": { "type": "object", "additionalProperties": { "type": "string" } },
+        "version": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
       }
     },
     "spec": {
@@ -30,10 +45,60 @@
           "type": "string",
           "enum": ["autonomous", "supervised", "advisory", "reactive"]
         },
+        "role": {
+          "type": "string",
+          "enum": ["strategic", "tactical", "analytical", "governance", "observer"]
+        },
         "purpose": { "type": "string" },
+        "model": {
+          "type": "object",
+          "properties": {
+            "provider": { "type": "string" },
+            "name": { "type": "string" },
+            "version": { "type": "string" }
+          }
+        },
         "capabilities": {
+          "oneOf": [
+            {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["name", "type"],
+                "properties": {
+                  "name": { "type": "string" },
+                  "type": { "enum": ["analysis", "generation", "classification", "monitoring", "orchestration"] },
+                  "description": { "type": "string" }
+                }
+              }
+            }
+          ]
+        },
+        "inputs": {
           "type": "array",
-          "items": { "type": "string" }
+          "items": {
+            "type": "object",
+            "required": ["name", "schema"],
+            "properties": {
+              "name": { "type": "string" },
+              "schema": { "type": "string" }
+            }
+          }
+        },
+        "outputs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "schema"],
+            "properties": {
+              "name": { "type": "string" },
+              "schema": { "type": "string" }
+            }
+          }
         },
         "constraints": {
           "type": "array",
@@ -46,7 +111,8 @@
             "required": ["event", "action"],
             "properties": {
               "event": { "type": "string" },
-              "action": { "type": "string" }
+              "action": { "type": "string" },
+              "condition": { "type": "string" }
             }
           }
         },
@@ -68,7 +134,66 @@
               "type": "string",
               "enum": ["session", "persistent", "shared"]
             },
-            "retention": { "type": "string" }
+            "retention": { "type": "string" },
+            "scope": {
+              "type": "string",
+              "enum": ["agent-private", "domain", "organization"]
+            }
+          }
+        },
+        "controller": {
+          "type": "object",
+          "properties": {
+            "watches": { "type": "array", "items": { "type": "string" } },
+            "reconcileInterval": { "type": "string" },
+            "driftThreshold": { "type": "number" }
+          }
+        },
+        "tokenBudget": {
+          "type": "object",
+          "properties": {
+            "maxDaily": { "type": "number" },
+            "maxMonthly": { "type": "number" },
+            "alertAt": { "type": "number" }
+          }
+        },
+        "schedule": {
+          "type": "object",
+          "properties": {
+            "type": { "enum": ["continuous", "cron", "event-driven"] },
+            "cron": { "type": "string" }
+          }
+        }
+      }
+    },
+    "status": {
+      "type": "object",
+      "properties": {
+        "state": { "enum": ["running", "paused", "degraded", "failed", "learning", "idle"] },
+        "lastExecution": { "type": "string", "format": "date-time" },
+        "avgLatency": { "type": "string" },
+        "costConsumed": {
+          "type": "object",
+          "properties": {
+            "value": { "type": "number" },
+            "currency": { "type": "string" }
+          }
+        },
+        "overrideRate": { "type": "number" },
+        "errorRate": { "type": "number" },
+        "healthScore": { "type": "number" },
+        "conditions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["type", "status"],
+            "properties": {
+              "type": { "type": "string" },
+              "status": { "enum": ["True", "False", "Unknown"] },
+              "reason": { "type": "string" },
+              "message": { "type": "string" },
+              "lastTransitionTime": { "type": "string", "format": "date-time" }
+            }
           }
         }
       }
