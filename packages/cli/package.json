@@ -1,0 +1,32 @@
+{
+  "name": "@ioa/cli",
+  "version": "0.1.0",
+  "description": "IOA CLI — scaffold, validate, and inspect AI-native organizations",
+  "type": "module",
+  "bin": {
+    "ioa": "dist/bin/ioa.js"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "clean": "rm -rf dist",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test dist/commands/*.test.js"
+  },
+  "dependencies": {
+    "@ioa/schemas": "workspace:*",
+    "@ioa/templates": "workspace:*",
+    "commander": "^13.0.0",
+    "yaml": "^2.7.0",
+    "picocolors": "^1.1.0",
+    "glob": "^11.0.0"
+  },
+  "devDependencies": {
+    "tsup": "^8.4.0",
+    "typescript": "^5.7.0",
+    "@types/node": "^22.0.0"
+  }
+}

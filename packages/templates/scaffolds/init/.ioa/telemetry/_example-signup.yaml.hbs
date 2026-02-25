@@ -1,0 +1,31 @@
+apiVersion: ioa.dev/v0.1
+kind: Telemetry
+metadata:
+  name: product-feature-released
+  owner: "{{orgName}}"
+spec:
+  event: "product.feature_released"
+  category: metric
+  description: "Emitted when a new feature is released to production"
+  payload:
+    type: object
+    properties:
+      featureName:
+        type: string
+      releaseDate:
+        type: string
+        format: date
+      targetAudience:
+        type: string
+    required:
+      - featureName
+      - releaseDate
+  metricsImpacted:
+    - feature-velocity
+    - user-satisfaction
+  source:
+    domain: product
+    agent: product-analyst
+  observability:
+    dashboard: true
+    alertThreshold: "< 2 releases/month"

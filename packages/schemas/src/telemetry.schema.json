@@ -1,0 +1,61 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://ioa.dev/schemas/v0.1/telemetry.json",
+  "title": "IOA Telemetry",
+  "description": "Defines a telemetry event contract with payload schema, metrics, and observability settings",
+  "type": "object",
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": { "const": "ioa.dev/v0.1" },
+    "kind": { "const": "Telemetry" },
+    "metadata": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+        "owner": { "type": "string" },
+        "labels": { "type": "object", "additionalProperties": { "type": "string" } },
+        "annotations": { "type": "object", "additionalProperties": { "type": "string" } }
+      }
+    },
+    "spec": {
+      "type": "object",
+      "required": ["event", "category"],
+      "properties": {
+        "event": {
+          "type": "string",
+          "pattern": "^[a-z]+\\.[a-z][a-z0-9_]*$",
+          "description": "Namespaced event name (e.g., 'domain.event_name')"
+        },
+        "category": {
+          "type": "string",
+          "enum": ["metric", "log", "trace", "alert"]
+        },
+        "description": { "type": "string" },
+        "payload": {
+          "type": "object",
+          "description": "JSON Schema fragment describing the event payload"
+        },
+        "metricsImpacted": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "source": {
+          "type": "object",
+          "properties": {
+            "domain": { "type": "string" },
+            "agent": { "type": "string" }
+          }
+        },
+        "observability": {
+          "type": "object",
+          "properties": {
+            "dashboard": { "type": "boolean" },
+            "alertThreshold": { "type": "string" }
+          }
+        }
+      }
+    }
+  },
+  "additionalProperties": false
+}

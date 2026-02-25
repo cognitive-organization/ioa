@@ -1,0 +1,60 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://ioa.dev/schemas/v0.1/domain.json",
+  "title": "IOA Domain",
+  "description": "Defines an organizational domain with boundaries, KPIs, and event contracts",
+  "type": "object",
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": { "const": "ioa.dev/v0.1" },
+    "kind": { "const": "Domain" },
+    "metadata": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+        "owner": { "type": "string" },
+        "labels": { "type": "object", "additionalProperties": { "type": "string" } },
+        "annotations": { "type": "object", "additionalProperties": { "type": "string" } }
+      }
+    },
+    "spec": {
+      "type": "object",
+      "required": ["purpose"],
+      "properties": {
+        "purpose": { "type": "string" },
+        "kpis": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "target"],
+            "properties": {
+              "name": { "type": "string" },
+              "target": { "type": "string" },
+              "unit": { "type": "string" }
+            }
+          }
+        },
+        "dataOwnership": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "events": {
+          "type": "object",
+          "properties": {
+            "produces": { "type": "array", "items": { "type": "string" } },
+            "consumes": { "type": "array", "items": { "type": "string" } }
+          }
+        },
+        "boundaries": {
+          "type": "object",
+          "properties": {
+            "includes": { "type": "array", "items": { "type": "string" } },
+            "excludes": { "type": "array", "items": { "type": "string" } }
+          }
+        }
+      }
+    }
+  },
+  "additionalProperties": false
+}

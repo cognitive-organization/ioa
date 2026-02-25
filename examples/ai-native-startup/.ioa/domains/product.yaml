@@ -1,0 +1,42 @@
+apiVersion: ioa.dev/v0.1
+kind: Domain
+metadata:
+  name: product
+  owner: "Acme AI"
+  labels:
+    tier: core
+spec:
+  purpose: "Core product development — features, roadmap, and user experience"
+  kpis:
+    - name: feature-velocity
+      target: "12 features/quarter"
+      unit: features
+    - name: user-satisfaction
+      target: ">4.5"
+      unit: NPS
+    - name: time-to-market
+      target: "<2 weeks"
+      unit: days
+  dataOwnership:
+    - product-catalog
+    - feature-flags
+    - user-feedback
+    - roadmap
+  events:
+    produces:
+      - product.feature-released
+      - product.feedback-analyzed
+      - product.roadmap-updated
+    consumes:
+      - analytics.user-behavior
+      - growth.churn-signal
+  boundaries:
+    includes:
+      - Feature planning and prioritization
+      - Product design and UX
+      - Release management
+      - User research
+    excludes:
+      - Infrastructure operations
+      - Financial reporting
+      - HR and hiring

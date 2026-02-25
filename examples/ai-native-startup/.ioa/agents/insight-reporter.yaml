@@ -1,0 +1,30 @@
+apiVersion: ioa.dev/v0.1
+kind: Agent
+metadata:
+  name: insight-reporter
+  owner: "Acme AI"
+  labels:
+    tier: support
+spec:
+  domain: analytics
+  type: reactive
+  purpose: "Generate and distribute insight reports when triggered by significant data changes"
+  capabilities:
+    - Automated report generation
+    - Cross-domain metric correlation
+    - Executive summary creation
+    - Slack/email distribution
+  constraints:
+    - Reports must be generated within 10 minutes of trigger
+    - Cannot send external communications without review
+    - Must include confidence intervals on predictions
+  triggers:
+    - event: analytics.insight-generated
+      action: Compile and distribute weekly report
+  governance:
+    escalatesTo: analytics-lead
+    requiresApproval: false
+    auditLevel: summary
+  memory:
+    type: session
+    retention: "7d"

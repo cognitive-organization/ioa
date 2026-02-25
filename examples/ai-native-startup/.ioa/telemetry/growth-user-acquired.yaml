@@ -1,0 +1,33 @@
+apiVersion: ioa.dev/v0.1
+kind: Telemetry
+metadata:
+  name: growth-user-acquired
+  owner: "Acme AI"
+spec:
+  event: "growth.user_acquired"
+  category: metric
+  description: "Emitted when a new user completes signup and activation"
+  payload:
+    type: object
+    properties:
+      userId:
+        type: string
+      channel:
+        type: string
+      plan:
+        type: string
+      activatedAt:
+        type: string
+        format: date-time
+    required:
+      - userId
+      - channel
+  metricsImpacted:
+    - monthly-active-users
+    - mrr
+  source:
+    domain: growth
+    agent: growth-optimizer
+  observability:
+    dashboard: true
+    alertThreshold: "< 10 signups/day"

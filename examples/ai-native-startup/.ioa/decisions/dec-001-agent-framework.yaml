@@ -1,0 +1,42 @@
+apiVersion: ioa.dev/v0.1
+kind: Decision
+metadata:
+  name: dec-001-agent-framework
+  owner: "Acme AI"
+spec:
+  id: "DEC-001"
+  status: accepted
+  domain: product
+  date: "2026-01-15"
+  deciders:
+    - CTO
+    - Product Lead
+  context: "We need to standardize how AI agents are designed, deployed, and governed across the organization. Without a framework, each team builds agents differently, creating inconsistency and governance gaps."
+  options:
+    - name: "Ad-hoc implementation"
+      description: "Each team builds and manages agents independently"
+      pros:
+        - Maximum flexibility per team
+        - No framework learning curve
+      cons:
+        - No standardization
+        - Governance gaps
+        - Duplicated effort
+    - name: "IOA doctrine"
+      description: "Adopt IOA as the organizational intelligence standard"
+      pros:
+        - Standardized resource model
+        - Built-in governance and validation
+        - Cross-domain consistency
+        - Community-backed evolution
+      cons:
+        - Initial adoption effort
+        - Framework constraints
+  chosen: "IOA doctrine"
+  rationale: "IOA provides the standardization we need without being overly prescriptive. The K8s-style resource model is familiar to our engineering team, and built-in validation catches configuration errors early."
+  kpiImpact:
+    - kpi: feature-velocity
+      expected: "+20% through standardized agent patterns"
+    - kpi: time-to-market
+      expected: "-30% for new agent deployments"
+  reversibility: moderate

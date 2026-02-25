@@ -1,0 +1,36 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://ioa.dev/schemas/v0.1/config.json",
+  "title": "IOA Config",
+  "description": "Project-level configuration file for .ioa/config.json",
+  "type": "object",
+  "required": ["name", "version"],
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Project name"
+    },
+    "version": {
+      "type": "string",
+      "description": "IOA doctrine version being used"
+    },
+    "description": { "type": "string" },
+    "organization": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "domain": { "type": "string" }
+      }
+    },
+    "paths": {
+      "type": "object",
+      "properties": {
+        "domains": { "type": "string", "default": "domains" },
+        "agents": { "type": "string", "default": "agents" },
+        "decisions": { "type": "string", "default": "decisions" },
+        "telemetry": { "type": "string", "default": "telemetry" },
+        "governance": { "type": "string", "default": "governance" }
+      }
+    }
+  }
+}

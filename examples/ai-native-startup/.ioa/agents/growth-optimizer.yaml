@@ -1,0 +1,32 @@
+apiVersion: ioa.dev/v0.1
+kind: Agent
+metadata:
+  name: growth-optimizer
+  owner: "Acme AI"
+  labels:
+    tier: core
+spec:
+  domain: growth
+  type: supervised
+  purpose: "Optimize user acquisition and retention through data-driven campaign management"
+  capabilities:
+    - A/B test design and analysis
+    - Campaign performance forecasting
+    - Churn prediction modeling
+    - Onboarding flow optimization
+  constraints:
+    - Campaign spend must be approved by growth lead
+    - Cannot modify pricing without explicit approval
+    - Must maintain minimum 95% deliverability
+  triggers:
+    - event: growth.churn-signal
+      action: Trigger retention campaign analysis
+    - event: growth.user-acquired
+      action: Update acquisition channel performance
+  governance:
+    escalatesTo: growth-lead
+    requiresApproval: true
+    auditLevel: full
+  memory:
+    type: persistent
+    retention: "180d"

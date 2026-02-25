@@ -1,0 +1,78 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://ioa.dev/schemas/v0.1/agent.json",
+  "title": "IOA Agent",
+  "description": "Defines an intelligent agent with capabilities, constraints, and governance rules",
+  "type": "object",
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": { "const": "ioa.dev/v0.1" },
+    "kind": { "const": "Agent" },
+    "metadata": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+        "owner": { "type": "string" },
+        "labels": { "type": "object", "additionalProperties": { "type": "string" } },
+        "annotations": { "type": "object", "additionalProperties": { "type": "string" } }
+      }
+    },
+    "spec": {
+      "type": "object",
+      "required": ["domain", "type", "purpose"],
+      "properties": {
+        "domain": {
+          "type": "string",
+          "description": "Reference to a domain name"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["autonomous", "supervised", "advisory", "reactive"]
+        },
+        "purpose": { "type": "string" },
+        "capabilities": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "constraints": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "triggers": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["event", "action"],
+            "properties": {
+              "event": { "type": "string" },
+              "action": { "type": "string" }
+            }
+          }
+        },
+        "governance": {
+          "type": "object",
+          "properties": {
+            "escalatesTo": { "type": "string" },
+            "requiresApproval": { "type": "boolean" },
+            "auditLevel": {
+              "type": "string",
+              "enum": ["full", "summary", "none"]
+            }
+          }
+        },
+        "memory": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": ["session", "persistent", "shared"]
+            },
+            "retention": { "type": "string" }
+          }
+        }
+      }
+    }
+  },
+  "additionalProperties": false
+}

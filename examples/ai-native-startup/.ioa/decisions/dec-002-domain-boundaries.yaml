@@ -1,0 +1,39 @@
+apiVersion: ioa.dev/v0.1
+kind: Decision
+metadata:
+  name: dec-002-domain-boundaries
+  owner: "Acme AI"
+spec:
+  id: "DEC-002"
+  status: accepted
+  domain: product
+  date: "2026-01-20"
+  deciders:
+    - CEO
+    - CTO
+    - Product Lead
+  context: "We need to define clear domain boundaries to avoid overlapping responsibilities and ensure each domain has explicit data ownership and event contracts."
+  options:
+    - name: "Functional boundaries"
+      description: "Split by business function: product, growth, analytics"
+      pros:
+        - Clear ownership
+        - Aligns with team structure
+        - Natural event boundaries
+      cons:
+        - May create silos
+        - Cross-functional features need coordination
+    - name: "Product-line boundaries"
+      description: "Split by product/service offering"
+      pros:
+        - End-to-end ownership
+        - Independent scaling
+      cons:
+        - Duplicated capabilities across lines
+        - Harder to share data
+  chosen: "Functional boundaries"
+  rationale: "At our current scale, functional boundaries provide the clearest ownership model. Each domain maps to a team with distinct KPIs. Cross-domain coordination happens through explicit event contracts."
+  kpiImpact:
+    - kpi: feature-velocity
+      expected: "Clearer ownership reduces coordination overhead"
+  reversibility: moderate

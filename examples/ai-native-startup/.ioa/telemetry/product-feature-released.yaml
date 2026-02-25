@@ -1,0 +1,33 @@
+apiVersion: ioa.dev/v0.1
+kind: Telemetry
+metadata:
+  name: product-feature-released
+  owner: "Acme AI"
+spec:
+  event: "product.feature_released"
+  category: metric
+  description: "Emitted when a new feature is released to production"
+  payload:
+    type: object
+    properties:
+      featureName:
+        type: string
+      releaseDate:
+        type: string
+        format: date
+      targetAudience:
+        type: string
+      rolloutPercentage:
+        type: number
+    required:
+      - featureName
+      - releaseDate
+  metricsImpacted:
+    - feature-velocity
+    - time-to-market
+  source:
+    domain: product
+    agent: product-analyst
+  observability:
+    dashboard: true
+    alertThreshold: "< 2 releases/month"

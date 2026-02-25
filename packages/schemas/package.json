@@ -1,0 +1,33 @@
+{
+  "name": "@ioa/schemas",
+  "version": "0.1.0",
+  "description": "IOA JSON Schemas and validators for organizational resources",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./schemas/*.json": "./src/*.schema.json"
+  },
+  "files": ["dist", "src/*.schema.json"],
+  "scripts": {
+    "build": "tsup",
+    "clean": "rm -rf dist",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test dist/validators/*.test.js"
+  },
+  "dependencies": {
+    "ajv": "^8.17.0",
+    "ajv-formats": "^3.0.0"
+  },
+  "devDependencies": {
+    "@ioa/doctrine": "workspace:*",
+    "@types/node": "^22.0.0",
+    "tsup": "^8.4.0",
+    "typescript": "^5.7.0",
+    "yaml": "^2.7.0"
+  }
+}

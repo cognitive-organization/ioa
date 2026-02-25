@@ -1,0 +1,16 @@
+{
+  "name": "ai-native-startup",
+  "version": "0.1",
+  "description": "Reference implementation of an AI-native startup using IOA",
+  "organization": {
+    "name": "Acme AI",
+    "domain": "acme.ai"
+  },
+  "paths": {
+    "domains": "domains",
+    "agents": "agents",
+    "decisions": "decisions",
+    "telemetry": "telemetry",
+    "governance": "governance"
+  }
+}

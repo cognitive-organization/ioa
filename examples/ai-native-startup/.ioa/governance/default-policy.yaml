@@ -1,0 +1,47 @@
+apiVersion: ioa.dev/v0.1
+kind: Governance
+metadata:
+  name: default-policy
+  owner: "Acme AI"
+spec:
+  domain: product
+  accessControl:
+    roles:
+      - name: admin
+        permissions:
+          - read
+          - write
+          - deploy
+          - override
+      - name: operator
+        permissions:
+          - read
+          - write
+      - name: viewer
+        permissions:
+          - read
+    defaultRole: viewer
+  promptVersioning:
+    enabled: true
+    repository: "prompts/"
+  audit:
+    enabled: true
+    retention: "365d"
+    level: full
+  failureModes:
+    - scenario: "Agent unresponsive for > 5 minutes"
+      response: "Activate fallback manual process"
+      escalation: "Page domain owner via PagerDuty"
+    - scenario: "Conflicting agent recommendations"
+      response: "Halt automated actions pending human review"
+      escalation: "Notify domain lead via Slack"
+    - scenario: "Data quality anomaly detected"
+      response: "Quarantine affected data, continue with last known good state"
+      escalation: "Alert data team within 15 minutes"
+  humanOverride:
+    enabled: true
+    channels:
+      - dashboard
+      - cli
+      - slack
+    maxResponseTime: "15m"

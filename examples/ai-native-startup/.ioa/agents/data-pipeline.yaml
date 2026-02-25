@@ -1,0 +1,32 @@
+apiVersion: ioa.dev/v0.1
+kind: Agent
+metadata:
+  name: data-pipeline
+  owner: "Acme AI"
+  labels:
+    tier: infrastructure
+spec:
+  domain: analytics
+  type: autonomous
+  purpose: "Collect, transform, and route event data across domains"
+  capabilities:
+    - Event stream ingestion
+    - Data transformation and enrichment
+    - Schema validation on incoming events
+    - Anomaly detection on data quality
+  constraints:
+    - Must process events within 5 minutes
+    - Cannot drop events — dead-letter queue required
+    - Data retention policies must be respected
+  triggers:
+    - event: product.feature-released
+      action: Index feature metadata
+    - event: growth.user-acquired
+      action: Enrich user profile data
+  governance:
+    escalatesTo: data-lead
+    requiresApproval: false
+    auditLevel: full
+  memory:
+    type: shared
+    retention: "30d"

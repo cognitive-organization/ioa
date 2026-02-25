@@ -1,0 +1,38 @@
+apiVersion: ioa.dev/v0.1
+kind: Decision
+metadata:
+  name: dec-001-agent-framework
+  owner: "{{orgName}}"
+spec:
+  id: "DEC-001"
+  status: proposed
+  domain: product
+  date: "2026-01-15"
+  deciders:
+    - CTO
+    - Product Lead
+  context: "We need to select an AI agent framework for our product domain agents."
+  options:
+    - name: "Custom implementation"
+      description: "Build agent orchestration from scratch"
+      pros:
+        - Full control over behavior
+        - No external dependencies
+      cons:
+        - High development cost
+        - Maintenance burden
+    - name: "IOA-aligned framework"
+      description: "Use IOA doctrine-compliant tooling"
+      pros:
+        - Standards-based
+        - Community support
+        - Built-in governance
+      cons:
+        - Learning curve
+        - Framework constraints
+  chosen: "IOA-aligned framework"
+  rationale: "Aligns with our organizational doctrine and provides governance out of the box."
+  kpiImpact:
+    - kpi: feature-velocity
+      expected: "+20% through automated insights"
+  reversibility: moderate

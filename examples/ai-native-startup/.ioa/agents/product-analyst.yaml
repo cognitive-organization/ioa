@@ -1,0 +1,34 @@
+apiVersion: ioa.dev/v0.1
+kind: Agent
+metadata:
+  name: product-analyst
+  owner: "Acme AI"
+  labels:
+    tier: core
+spec:
+  domain: product
+  type: advisory
+  purpose: "Analyze user feedback and market signals to surface actionable product insights"
+  capabilities:
+    - Sentiment analysis on user feedback
+    - Feature request clustering and prioritization
+    - Competitive landscape monitoring
+    - Weekly product insight reports
+    - Roadmap impact analysis
+  constraints:
+    - Cannot make product decisions autonomously
+    - Must cite data sources in all recommendations
+    - Escalates conflicting signals to product lead
+    - Maximum 100 API calls per hour
+  triggers:
+    - event: product.feedback-analyzed
+      action: Update insight dashboard
+    - event: analytics.user-behavior
+      action: Refresh usage pattern analysis
+  governance:
+    escalatesTo: product-lead
+    requiresApproval: false
+    auditLevel: summary
+  memory:
+    type: persistent
+    retention: "90d"

@@ -1,0 +1,38 @@
+apiVersion: ioa.dev/v0.1
+kind: Domain
+metadata:
+  name: analytics
+  owner: "Acme AI"
+  labels:
+    tier: support
+spec:
+  purpose: "Data collection, analysis, and insight generation across all domains"
+  kpis:
+    - name: data-freshness
+      target: "<1h"
+      unit: hours
+    - name: insight-accuracy
+      target: ">90%"
+      unit: percent
+  dataOwnership:
+    - event-streams
+    - dashboards
+    - data-warehouse
+  events:
+    produces:
+      - analytics.user-behavior
+      - analytics.insight-generated
+    consumes:
+      - product.feature-released
+      - product.feedback-analyzed
+      - growth.user-acquired
+      - growth.churn-signal
+  boundaries:
+    includes:
+      - Event tracking and collection
+      - Dashboard creation
+      - Behavioral analysis
+      - Reporting
+    excludes:
+      - Product decisions
+      - Campaign execution
