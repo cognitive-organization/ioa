@@ -1,0 +1,351 @@
+name: CEO Cockpit — Daily Digest
+
+on:
+  schedule:
+    # 06:00 BRT = 09:00 UTC, weekdays only
+    - cron: '0 9 * * 1-5'
+  workflow_dispatch:
+
+permissions:
+  issues: write
+  contents: read
+  pull-requests: read
+
+jobs:
+  daily-digest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate CEO Cockpit Report
+        uses: actions/github-script@v8
+        with:
+          github-token: ${{ secrets.GH_PAT }}
+          script: |
+            const now = new Date();
+            const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+            const since = yesterday.toISOString();
+
+            const brtDate = now.toLocaleDateString('pt-BR', {
+              timeZone: 'America/Sao_Paulo',
+              weekday: 'long',
+              year: 'numeric',
+              month: 'long',
+              day: 'numeric'
+            });
+
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+
+            // === Project Board Data via GraphQL ===
+            const PROJECT_NUMBER = 1;
+            const projectOwner = 'cognitive-organization';
+            let projectItems = [];
+            try {
+              const result = await github.graphql(`
+                query($owner: String!, $number: Int!) {
+                  organization(login: $owner) {
+                    projectV2(number: $number) {
+                      items(first: 100) {
+                        nodes {
+                          fieldValues(first: 20) {
+                            nodes {
+                              ... on ProjectV2ItemFieldSingleSelectValue {
+                                name
+                                field { ... on ProjectV2SingleSelectField { name } }
+                              }
+                              ... on ProjectV2ItemFieldTextValue {
+                                text
+                                field { ... on ProjectV2FieldCommon { name } }
+                              }
+                            }
+                          }
+                          content {
+                            ... on Issue {
+                              number
+                              title
+                              url
+                              state
+                              labels(first: 10) {
+                                nodes { name }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              `, { owner: projectOwner, number: PROJECT_NUMBER });
+
+              projectItems = result.organization.projectV2.items.nodes
+                .filter(item => item.content && item.content.number)
+                .map(item => {
+                  const fields = {};
+                  for (const fv of item.fieldValues.nodes) {
+                    if (fv.field && fv.field.name) {
+                      fields[fv.field.name] = fv.name || fv.text || '';
+                    }
+                  }
+                  return {
+                    number: item.content.number,
+                    title: item.content.title,
+                    url: item.content.url,
+                    state: item.content.state,
+                    labels: item.content.labels.nodes.map(l => l.name),
+                    ...fields
+                  };
+                });
+            } catch (e) {
+              console.log(`Project query failed: ${e.message}`);
+            }
+
+            // === Counts by Status ===
+            const statusCounts = {};
+            const agentCounts = {};
+            const priorityCounts = {};
+            const blockedItems = [];
+            const tonightItems = [];
+            const runningItems = [];
+            const reviewItems = [];
+
+            for (const item of projectItems) {
+              const status = item.Status || 'Unknown';
+              const agent = item.Agent || '—';
+              const priority = item.Priority || '—';
+
+              statusCounts[status] = (statusCounts[status] || 0) + 1;
+              agentCounts[agent] = (agentCounts[agent] || 0) + 1;
+              priorityCounts[priority] = (priorityCounts[priority] || 0) + 1;
+
+              if (status.includes('Blocked')) blockedItems.push(item);
+              if (status.includes('Tonight')) tonightItems.push(item);
+              if (status.includes('Running')) runningItems.push(item);
+              if (status.includes('Review')) reviewItems.push(item);
+            }
+
+            // === Commits in last 24h ===
+            let commits = [];
+            try {
+              const { data } = await github.rest.repos.listCommits({
+                owner, repo, since, per_page: 20
+              });
+              commits = data;
+            } catch (e) {
+              console.log('No commits found');
+            }
+
+            // === PRs merged in last 24h ===
+            let mergedPRs = [];
+            try {
+              const { data } = await github.rest.pulls.list({
+                owner, repo, state: 'closed', sort: 'updated', direction: 'desc', per_page: 20
+              });
+              mergedPRs = data.filter(pr =>
+                pr.merged_at && new Date(pr.merged_at) > yesterday
+              );
+            } catch (e) {
+              console.log('No merged PRs found');
+            }
+
+            // === Issues opened/closed in last 24h ===
+            let openedIssues = [];
+            let closedIssues = [];
+            try {
+              const { data } = await github.rest.issues.listForRepo({
+                owner, repo, state: 'all', since, sort: 'updated', direction: 'desc', per_page: 50
+              });
+              const issues = data.filter(i => !i.pull_request);
+              openedIssues = issues.filter(i => new Date(i.created_at) > yesterday);
+              closedIssues = issues.filter(i => i.closed_at && new Date(i.closed_at) > yesterday);
+            } catch (e) {
+              console.log('No issues found');
+            }
+
+            // === Decision queue ===
+            let decisionIssues = [];
+            try {
+              const { data } = await github.rest.issues.listForRepo({
+                owner, repo, state: 'open', labels: 'status:needs-decision', per_page: 20
+              });
+              decisionIssues = data.filter(i => !i.pull_request);
+            } catch (e) {
+              console.log('No decision issues found');
+            }
+
+            // === BUILD REPORT ===
+            let body = `# CEO Cockpit — ${brtDate}\n\n`;
+
+            // Board Summary
+            body += `## Board Summary\n\n`;
+            body += `| Status | Count |\n|--------|-------|\n`;
+            const statusOrder = ['🚀 Roadmap', '🧠 Backlog', '🌙 Tonight', '⚙️ Running', '🔍 Review', '✅ Done', '⛔ Blocked'];
+            for (const s of statusOrder) {
+              if (statusCounts[s]) {
+                body += `| ${s} | ${statusCounts[s]} |\n`;
+              }
+            }
+            body += `\n`;
+
+            body += `**By Agent:**`;
+            const agentEntries = Object.entries(agentCounts).sort((a, b) => b[1] - a[1]);
+            for (const [agent, count] of agentEntries) {
+              body += ` ${agent} (${count})`;
+            }
+            body += `\n\n`;
+
+            body += `**By Priority:**`;
+            for (const p of ['P0', 'P1', 'P2', 'P3']) {
+              if (priorityCounts[p]) body += ` ${p} (${priorityCounts[p]})`;
+            }
+            body += `\n\n`;
+
+            // Tonight Queue
+            body += `## 🌙 Tonight Queue (${tonightItems.length})\n\n`;
+            if (tonightItems.length === 0) {
+              body += `_Nenhuma issue programada para tonight_\n\n`;
+            } else {
+              for (const item of tonightItems) {
+                body += `- [#${item.number}](${item.url}) ${item.title} — **${item.Agent || '—'}** (${item.Priority || '—'})\n`;
+              }
+              body += `\n`;
+            }
+
+            // Running
+            if (runningItems.length > 0) {
+              body += `## ⚙️ Running (${runningItems.length})\n\n`;
+              for (const item of runningItems) {
+                body += `- [#${item.number}](${item.url}) ${item.title} — **${item.Agent || '—'}**\n`;
+              }
+              body += `\n`;
+            }
+
+            // Review
+            if (reviewItems.length > 0) {
+              body += `## 🔍 Review (${reviewItems.length})\n\n`;
+              for (const item of reviewItems) {
+                body += `- [#${item.number}](${item.url}) ${item.title}\n`;
+              }
+              body += `\n`;
+            }
+
+            // Blockers
+            body += `## ⛔ Blockers (${blockedItems.length})\n\n`;
+            if (blockedItems.length === 0) {
+              body += `_Nenhum blocker ativo_\n\n`;
+            } else {
+              for (const item of blockedItems) {
+                body += `- [#${item.number}](${item.url}) ${item.title}\n`;
+              }
+              body += `\n`;
+            }
+
+            // Decisions
+            body += `## Decisões Pendentes (${decisionIssues.length})\n\n`;
+            if (decisionIssues.length === 0) {
+              body += `_Nenhuma decisão pendente_\n\n`;
+            } else {
+              for (const i of decisionIssues) {
+                body += `- [#${i.number}](${i.html_url}) ${i.title}\n`;
+              }
+              body += `\n`;
+            }
+
+            // Issues movidas
+            body += `## Movimentação 24h\n\n`;
+            body += `**Issues abertas:** ${openedIssues.length} | **Issues fechadas:** ${closedIssues.length}\n\n`;
+            if (openedIssues.length > 0) {
+              for (const i of openedIssues) {
+                body += `- 🆕 [#${i.number}](${i.html_url}) ${i.title}\n`;
+              }
+            }
+            if (closedIssues.length > 0) {
+              for (const i of closedIssues) {
+                body += `- ✅ [#${i.number}](${i.html_url}) ${i.title}\n`;
+              }
+            }
+            if (openedIssues.length === 0 && closedIssues.length === 0) {
+              body += `_Nenhuma movimentação_\n`;
+            }
+            body += `\n`;
+
+            // Commits & PRs
+            body += `## Commits & PRs\n\n`;
+            body += `**Commits (${commits.length}):**\n`;
+            if (commits.length === 0) {
+              body += `_Nenhum commit nas últimas 24h_\n`;
+            } else {
+              for (const c of commits.slice(0, 10)) {
+                const msg = c.commit.message.split('\n')[0];
+                const sha = c.sha.substring(0, 7);
+                body += `- [\`${sha}\`](${c.html_url}) ${msg}\n`;
+              }
+              if (commits.length > 10) body += `- _... e mais ${commits.length - 10}_\n`;
+            }
+            body += `\n`;
+
+            body += `**PRs Merged (${mergedPRs.length}):**\n`;
+            if (mergedPRs.length === 0) {
+              body += `_Nenhum PR merged_\n`;
+            } else {
+              for (const pr of mergedPRs) {
+                body += `- [#${pr.number}](${pr.html_url}) ${pr.title}\n`;
+              }
+            }
+            body += `\n`;
+
+            // Metrics
+            const doneCount = statusCounts['✅ Done'] || 0;
+            const wipCount = (statusCounts['⚙️ Running'] || 0) + (statusCounts['🔍 Review'] || 0);
+            const totalOpen = projectItems.filter(i => i.state === 'OPEN').length;
+
+            body += `## Métricas\n\n`;
+            body += `| Métrica | Valor |\n|---------|-------|\n`;
+            body += `| Done (total) | ${doneCount} |\n`;
+            body += `| WIP (Running + Review) | ${wipCount} |\n`;
+            body += `| Blocked | ${blockedItems.length} |\n`;
+            body += `| Tonight Queue | ${tonightItems.length} |\n`;
+            body += `| Total Open | ${totalOpen} |\n`;
+            body += `| Closed 24h | ${closedIssues.length} |\n`;
+            body += `\n`;
+
+            // CEO Action Items
+            body += `## 🎯 Ações Sugeridas para Hoje\n\n`;
+            const actions = [];
+
+            if (blockedItems.length > 0) {
+              actions.push(`🟡 **Resolver blockers:** ${blockedItems.map(i => `#${i.number}`).join(', ')} precisam de ação.`);
+            }
+
+            if (tonightItems.length === 0) {
+              const backlogReady = projectItems.filter(i =>
+                (i.Status || '').includes('Backlog') && (i.Priority === 'P0' || i.Priority === 'P1')
+              ).slice(0, 3);
+              if (backlogReady.length > 0) {
+                actions.push(`🌙 **Tonight vazio!** Mover para Tonight: ${backlogReady.map(i => `#${i.number} (${i.Priority})`).join(', ')}`);
+              }
+            }
+
+            if (reviewItems.length > 0) {
+              actions.push(`🔍 **Revisar:** ${reviewItems.map(i => `#${i.number}`).join(', ')} aguardam aprovação.`);
+            }
+
+            if (decisionIssues.length > 0) {
+              actions.push(`🧠 **Decidir:** ${decisionIssues.map(i => `#${i.number} ${i.title}`).join(', ')}`);
+            }
+
+            if (actions.length === 0) {
+              actions.push(`✅ **Tudo fluindo bem.** Board saudável, sem ações urgentes.`);
+            }
+
+            for (const action of actions) {
+              body += `${action}\n\n`;
+            }
+
+            body += `---\n_CEO Cockpit gerado automaticamente às ${now.toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo' })} BRT_`;
+
+            // Post to Issue #1
+            await github.rest.issues.createComment({
+              owner, repo,
+              issue_number: 1,
+              body
+            });
+            console.log('Cockpit report posted to issue #1');

@@ -1,0 +1,311 @@
+name: Nightly Agent — Tonight Queue Executor
+
+on:
+  schedule:
+    # 22:00 BRT = 01:00 UTC (next day)
+    - cron: '0 1 * * *'
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: 'Specific issue number to process (leave empty for full Tonight queue)'
+        required: false
+        type: string
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+  id-token: write
+
+env:
+  PROJECT_ID: PVT_kwDOD7tWds4BQMSA
+  STATUS_FIELD_ID: PVTSSF_lADOD7tWds4BQMSAzg-Yg1o
+  STATUS_RUNNING: c5a2ecf9
+  STATUS_REVIEW: c6f6f3fd
+  STATUS_BLOCKED: c5814345
+
+jobs:
+  get-tonight-queue:
+    runs-on: ubuntu-latest
+    outputs:
+      issues: ${{ steps.query.outputs.issues }}
+      count: ${{ steps.query.outputs.count }}
+    steps:
+      - name: Query Tonight Queue from Project
+        id: query
+        uses: actions/github-script@v8
+        with:
+          github-token: ${{ secrets.GH_PAT }}
+          script: |
+            const PROJECT_NUMBER = 1;
+            const projectOwner = 'cognitive-organization';
+            const owner = context.repo.owner;
+
+            // If a specific issue was requested, use that
+            const inputIssue = '${{ inputs.issue_number }}';
+            if (inputIssue) {
+              const num = parseInt(inputIssue);
+              const result = await github.graphql(`
+                query($owner: String!, $number: Int!) {
+                  organization(login: $owner) {
+                    projectV2(number: $number) {
+                      items(first: 100) {
+                        nodes {
+                          id
+                          content { ... on Issue { number } }
+                        }
+                      }
+                    }
+                  }
+                }
+              `, { owner: projectOwner, number: PROJECT_NUMBER });
+              const item = result.organization.projectV2.items.nodes.find(
+                n => n.content && n.content.number === num
+              );
+              const { data: issue } = await github.rest.issues.get({
+                owner, repo: context.repo.repo, issue_number: num
+              });
+              const issues = JSON.stringify([{
+                number: num,
+                title: issue.title,
+                agent: 'Builder',
+                itemId: item ? item.id : ''
+              }]);
+              core.setOutput('issues', issues);
+              core.setOutput('count', '1');
+              return;
+            }
+
+            // Query project for Tonight items
+            const result = await github.graphql(`
+              query($owner: String!, $number: Int!) {
+                organization(login: $owner) {
+                  projectV2(number: $number) {
+                    items(first: 100) {
+                      nodes {
+                        id
+                        fieldValues(first: 10) {
+                          nodes {
+                            ... on ProjectV2ItemFieldSingleSelectValue {
+                              name
+                              field { ... on ProjectV2SingleSelectField { name } }
+                            }
+                          }
+                        }
+                        content {
+                          ... on Issue {
+                            number
+                            title
+                            state
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            `, { owner: projectOwner, number: PROJECT_NUMBER });
+
+            const tonightIssues = result.organization.projectV2.items.nodes
+              .filter(item => {
+                if (!item.content || item.content.state !== 'OPEN') return false;
+                const statusField = item.fieldValues.nodes.find(
+                  fv => fv.field && fv.field.name === 'Status'
+                );
+                return statusField && statusField.name && statusField.name.includes('Tonight');
+              })
+              .map(item => {
+                const agentField = item.fieldValues.nodes.find(
+                  fv => fv.field && fv.field.name === 'Agent'
+                );
+                return {
+                  number: item.content.number,
+                  title: item.content.title,
+                  agent: agentField ? agentField.name : 'Builder',
+                  itemId: item.id
+                };
+              });
+
+            core.setOutput('issues', JSON.stringify(tonightIssues));
+            core.setOutput('count', String(tonightIssues.length));
+            console.log(`Found ${tonightIssues.length} Tonight issues: ${tonightIssues.map(i => `#${i.number}`).join(', ')}`);
+
+  process-issue:
+    needs: get-tonight-queue
+    if: needs.get-tonight-queue.outputs.count != '0'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+      id-token: write
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        issue: ${{ fromJson(needs.get-tonight-queue.outputs.issues) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Move to Running on Project Board
+        uses: actions/github-script@v8
+        with:
+          github-token: ${{ secrets.GH_PAT }}
+          script: |
+            const itemId = '${{ matrix.issue.itemId }}';
+            if (!itemId) {
+              console.log('No itemId — skipping board update');
+              return;
+            }
+            await github.graphql(`
+              mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $optionId: String!) {
+                updateProjectV2ItemFieldValue(input: {
+                  projectId: $projectId
+                  itemId: $itemId
+                  fieldId: $fieldId
+                  value: { singleSelectOptionId: $optionId }
+                }) { projectV2Item { id } }
+              }
+            `, {
+              projectId: process.env.PROJECT_ID,
+              itemId,
+              fieldId: process.env.STATUS_FIELD_ID,
+              optionId: process.env.STATUS_RUNNING
+            });
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: ${{ matrix.issue.number }},
+              body: '⚙️ **Nightly Agent** starting work on this issue.\n\nAgent: `${{ matrix.issue.agent }}`\nStatus moved to: **Running**'
+            });
+
+      - name: Execute with Claude Code
+        id: claude
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          show_full_output: true
+          prompt: |
+            You are a ${{ matrix.issue.agent }} agent working on issue #${{ matrix.issue.number }}: "${{ matrix.issue.title }}"
+
+            Read the issue body from GitHub to understand the full requirements:
+            gh issue view ${{ matrix.issue.number }}
+
+            Then read the CLAUDE.md file to understand the project architecture and standards.
+
+            IMPORTANT RULES:
+            1. Follow the project's engineering patterns (CLAUDE.md)
+            2. Create a feature branch: agent/${{ matrix.issue.number }}-<short-description>
+            3. Make focused, clean commits
+            4. Write code that passes linting and builds (`pnpm build`)
+            5. If the issue has a "Definition of Done" checklist, verify each item
+            6. If you encounter a blocker you can't resolve, comment on the issue and stop
+            7. Do NOT modify unrelated files
+            8. Create a PR when done, referencing the issue
+
+            After completing the work, create a pull request with:
+            - Title referencing the issue
+            - Body with summary of changes and what was done
+            - Link to the issue with "Closes #${{ matrix.issue.number }}"
+          claude_args: |
+            --max-turns 60
+            --allowedTools Edit,Read,Write,Bash,Glob,Grep
+
+      - name: Move to Review on Project Board
+        if: success()
+        uses: actions/github-script@v8
+        with:
+          github-token: ${{ secrets.GH_PAT }}
+          script: |
+            const itemId = '${{ matrix.issue.itemId }}';
+            if (!itemId) return;
+            await github.graphql(`
+              mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $optionId: String!) {
+                updateProjectV2ItemFieldValue(input: {
+                  projectId: $projectId
+                  itemId: $itemId
+                  fieldId: $fieldId
+                  value: { singleSelectOptionId: $optionId }
+                }) { projectV2Item { id } }
+              }
+            `, {
+              projectId: process.env.PROJECT_ID,
+              itemId,
+              fieldId: process.env.STATUS_FIELD_ID,
+              optionId: process.env.STATUS_REVIEW
+            });
+
+      - name: Move to Blocked if failed
+        if: failure()
+        uses: actions/github-script@v8
+        with:
+          github-token: ${{ secrets.GH_PAT }}
+          script: |
+            const itemId = '${{ matrix.issue.itemId }}';
+            if (!itemId) return;
+            await github.graphql(`
+              mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $optionId: String!) {
+                updateProjectV2ItemFieldValue(input: {
+                  projectId: $projectId
+                  itemId: $itemId
+                  fieldId: $fieldId
+                  value: { singleSelectOptionId: $optionId }
+                }) { projectV2Item { id } }
+              }
+            `, {
+              projectId: process.env.PROJECT_ID,
+              itemId,
+              fieldId: process.env.STATUS_FIELD_ID,
+              optionId: process.env.STATUS_BLOCKED
+            });
+
+      - name: Comment result on issue
+        if: always()
+        uses: actions/github-script@v8
+        with:
+          github-token: ${{ secrets.GH_PAT }}
+          script: |
+            const status = '${{ job.status }}' === 'success' ? '✅' : '⚠️';
+            const newStatus = '${{ job.status }}' === 'success' ? '🔍 Review' : '⛔ Blocked';
+            const message = '${{ job.status }}' === 'success'
+              ? `${status} **Nightly Agent** completed. Check for a new PR.\n\nStatus moved to: **${newStatus}**`
+              : `${status} **Nightly Agent** encountered issues. Manual review needed.\n\nStatus moved to: **${newStatus}**\n\n[View workflow run](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})`;
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: ${{ matrix.issue.number }},
+              body: message
+            });
+
+  summary:
+    needs: [get-tonight-queue, process-issue]
+    if: always() && needs.get-tonight-queue.outputs.count != '0'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Post nightly summary
+        uses: actions/github-script@v8
+        with:
+          github-token: ${{ secrets.GH_PAT }}
+          script: |
+            const issues = JSON.parse('${{ needs.get-tonight-queue.outputs.issues }}');
+            const status = '${{ needs.process-issue.result }}';
+
+            let body = `## 🌙 Nightly Agent Report\n\n`;
+            body += `**Status:** ${status === 'success' ? '✅ All tasks completed' : '⚠️ Some tasks need attention'}\n`;
+            body += `**Issues processed:** ${issues.length}\n\n`;
+
+            for (const issue of issues) {
+              body += `- #${issue.number} ${issue.title} (${issue.agent})\n`;
+            }
+
+            body += `\n[View workflow run](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})`;
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: 1,
+              body
+            });
