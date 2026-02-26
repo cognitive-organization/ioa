@@ -1,6 +1,6 @@
 {
   "name": "@ioa/schemas",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "IOA JSON Schemas and validators for organizational resources",
   "type": "module",
   "main": "dist/index.js",

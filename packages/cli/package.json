@@ -1,6 +1,6 @@
 {
   "name": "@ioa/cli",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "IOA CLI — scaffold, validate, and inspect AI-native organizations",
   "type": "module",
   "bin": {
