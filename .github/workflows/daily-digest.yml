@@ -16,6 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Generate CEO Cockpit Report
+        id: report
         uses: actions/github-script@v8
         with:
           github-token: ${{ secrets.GH_PAT }}
@@ -342,6 +343,11 @@ jobs:
 
             body += `---\n_CEO Cockpit gerado automaticamente às ${now.toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo' })} BRT_`;
 
+            // Save report to file for Slack step
+            const fs = require('fs');
+            fs.writeFileSync('digest-report.md', body);
+            core.setOutput('report_date', brtDate);
+
             // Post to Issue #1
             await github.rest.issues.createComment({
               owner, repo,
@@ -349,3 +355,59 @@ jobs:
               body
             });
             console.log('Cockpit report posted to issue #1');
+
+      - name: Send digest to Slack
+        if: ${{ env.HAS_SLACK == 'true' }}
+        env:
+          HAS_SLACK: ${{ secrets.SLACK_WEBHOOK_URL != '' }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          export TITLE="IOA CEO Cockpit — ${{ steps.report.outputs.report_date }}"
+
+          # Split report into chunks respecting Slack's 3000 char section limit
+          python3 - <<'PYEOF'
+          import json, os
+
+          with open('digest-report.md', 'r') as f:
+              report = f.read()
+
+          title = os.environ['TITLE']
+          blocks = [
+              {"type": "header", "text": {"type": "plain_text", "text": title[:150]}}
+          ]
+
+          # Split by ## headings to keep sections together
+          sections = report.split('\n## ')
+          chunks = []
+          current = ''
+          for i, section in enumerate(sections):
+              piece = section if i == 0 else f'## {section}'
+              if len(current) + len(piece) > 2900:
+                  if current:
+                      chunks.append(current)
+                  current = piece[:2900]
+              else:
+                  current += piece
+          if current:
+              chunks.append(current)
+
+          for chunk in chunks:
+              blocks.append({"type": "section", "text": {"type": "mrkdwn", "text": chunk[:3000]}})
+              blocks.append({"type": "divider"})
+
+          payload = json.dumps({"text": title, "blocks": blocks[:50]})
+          with open('slack-payload.json', 'w') as f:
+              f.write(payload)
+          PYEOF
+
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$SLACK_WEBHOOK_URL" \
+            -H 'Content-Type: application/json' \
+            -d @slack-payload.json)
+
+          HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+          BODY=$(echo "$RESPONSE" | head -1)
+          echo "Slack response: $HTTP_CODE — $BODY"
+
+          if [ "$BODY" != "ok" ]; then
+            echo "::warning::Slack delivery failed: $BODY"
+          fi
