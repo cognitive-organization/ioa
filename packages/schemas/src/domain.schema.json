@@ -110,7 +110,8 @@
           "type": "object",
           "properties": {
             "value": { "type": "number" },
-            "currency": { "type": "string" }
+            "currency": { "type": "string" },
+            "period": { "type": "string" }
           }
         },
         "decisionVelocity": {

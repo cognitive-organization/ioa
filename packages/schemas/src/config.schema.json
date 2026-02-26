@@ -30,7 +30,10 @@
         "decisions": { "type": "string", "default": "decisions" },
         "telemetry": { "type": "string", "default": "telemetry" },
         "governance": { "type": "string", "default": "governance" },
-        "workflows": { "type": "string", "default": "workflows" }
+        "workflows": { "type": "string", "default": "workflows" },
+        "security": { "type": "string", "default": "security" },
+        "budgets": { "type": "string", "default": "budgets" },
+        "memory": { "type": "string", "default": "memory" }
       }
     }
   }

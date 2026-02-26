@@ -1,0 +1,119 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://ioa.dev/schemas/v0.2/security-policy.json",
+  "title": "IOA SecurityPolicy",
+  "description": "Defines security boundaries: agent identity, data scopes, zero-trust rules, audit requirements, and prompt injection defenses",
+  "type": "object",
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": { "enum": ["ioa.dev/v0.2"] },
+    "kind": { "const": "SecurityPolicy" },
+    "metadata": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+        "owner": {
+          "oneOf": [
+            { "type": "string" },
+            {
+              "type": "object",
+              "required": ["name"],
+              "properties": {
+                "name": { "type": "string" },
+                "role": { "type": "string" }
+              }
+            }
+          ]
+        },
+        "labels": { "type": "object", "additionalProperties": { "type": "string" } },
+        "annotations": { "type": "object", "additionalProperties": { "type": "string" } },
+        "version": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "spec": {
+      "type": "object",
+      "required": ["domain"],
+      "properties": {
+        "domain": { "type": "string", "description": "Reference to a domain name" },
+        "agentIdentity": {
+          "type": "object",
+          "properties": {
+            "required": { "type": "boolean", "default": true },
+            "method": { "type": "string", "enum": ["certificate", "token", "api-key"] }
+          }
+        },
+        "dataScopes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["resource", "classification"],
+            "properties": {
+              "resource": { "type": "string" },
+              "classification": { "enum": ["public", "internal", "confidential", "restricted"] },
+              "allowedAgents": { "type": "array", "items": { "type": "string" } },
+              "allowedOperations": { "type": "array", "items": { "enum": ["read", "write", "delete", "execute"] } }
+            }
+          }
+        },
+        "zeroTrust": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean", "default": false },
+            "verifyOnEveryCall": { "type": "boolean" },
+            "maxSessionDuration": { "type": "string" }
+          }
+        },
+        "auditTrail": {
+          "type": "object",
+          "properties": {
+            "immutable": { "type": "boolean", "default": true },
+            "retention": { "type": "string" },
+            "events": { "type": "array", "items": { "type": "string" } }
+          }
+        },
+        "promptInjectionDefense": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean", "default": true },
+            "sanitizeInputs": { "type": "boolean" },
+            "detectPatterns": { "type": "array", "items": { "type": "string" } },
+            "onDetection": { "type": "string", "enum": ["block", "warn", "log"] }
+          }
+        },
+        "enforcementMode": {
+          "type": "string",
+          "enum": ["enforce", "warn", "advise", "observe"],
+          "default": "warn"
+        }
+      }
+    },
+    "status": {
+      "type": "object",
+      "properties": {
+        "activePolicies": { "type": "integer" },
+        "violations": { "type": "integer" },
+        "lastAudit": { "type": "string", "format": "date-time" },
+        "threatLevel": { "type": "string", "enum": ["none", "low", "medium", "high", "critical"] },
+        "blockedOperations": { "type": "integer" },
+        "conditions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["type", "status"],
+            "properties": {
+              "type": { "type": "string" },
+              "status": { "enum": ["True", "False", "Unknown"] },
+              "reason": { "type": "string" },
+              "message": { "type": "string" },
+              "lastTransitionTime": { "type": "string", "format": "date-time" }
+            }
+          }
+        }
+      }
+    }
+  },
+  "additionalProperties": false
+}

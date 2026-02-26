@@ -74,7 +74,7 @@ export interface IoaDomainSpec {
 
 export interface IoaDomainStatus {
   health?: "healthy" | "degraded" | "critical";
-  costToDate?: { value?: number; currency?: string };
+  costToDate?: { value?: number; currency?: string; period?: string };
   decisionVelocity?: { decisionsPerWeek?: number; avgLeadTimeDays?: number };
   cognitiveLoadScore?: number;
   activeAgents?: number;
@@ -162,7 +162,7 @@ export interface IoaAgentSpec {
   governance?: IoaAgentGovernance;
   memory?: IoaAgentMemory;
   tokenBudget?: IoaAgentTokenBudget;
-  schedule?: IoaAgentSchedule | string;
+  schedule?: IoaAgentSchedule;
 }
 
 export interface IoaAgentStatus {
@@ -279,7 +279,7 @@ export interface IoaTelemetryAlertRule {
     value?: number;
     window?: string;
   };
-  severity?: "warning" | "critical";
+  severity?: "info" | "warning" | "error" | "critical";
   channels?: string[];
 }
 
@@ -368,7 +368,7 @@ export interface IoaGovernanceHumanOverride {
 export interface IoaGovernanceEscalationPath {
   level: number;
   role: string;
-  channel: string;
+  channel?: string;
   timeout?: string;
 }
 
@@ -471,6 +471,249 @@ export interface IoaWorkflow {
 }
 
 // ---------------------------------------------------------------------------
+// SecurityPolicy (NEW in v0.2)
+// ---------------------------------------------------------------------------
+
+export interface IoaSecurityPolicyDataScope {
+  resource: string;
+  classification: "public" | "internal" | "confidential" | "restricted";
+  allowedAgents?: string[];
+  allowedOperations?: ("read" | "write" | "delete" | "execute")[];
+}
+
+export interface IoaSecurityPolicyAgentIdentity {
+  required?: boolean;
+  method?: "certificate" | "token" | "api-key";
+}
+
+export interface IoaSecurityPolicyZeroTrust {
+  enabled?: boolean;
+  verifyOnEveryCall?: boolean;
+  maxSessionDuration?: string;
+}
+
+export interface IoaSecurityPolicyAuditTrail {
+  immutable?: boolean;
+  retention?: string;
+  events?: string[];
+}
+
+export interface IoaSecurityPolicyPromptInjectionDefense {
+  enabled?: boolean;
+  sanitizeInputs?: boolean;
+  detectPatterns?: string[];
+  onDetection?: "block" | "warn" | "log";
+}
+
+export interface IoaSecurityPolicySpec {
+  domain: string;
+  agentIdentity?: IoaSecurityPolicyAgentIdentity;
+  dataScopes?: IoaSecurityPolicyDataScope[];
+  zeroTrust?: IoaSecurityPolicyZeroTrust;
+  auditTrail?: IoaSecurityPolicyAuditTrail;
+  promptInjectionDefense?: IoaSecurityPolicyPromptInjectionDefense;
+  enforcementMode?: "enforce" | "warn" | "advise" | "observe";
+}
+
+export interface IoaSecurityPolicyStatus {
+  activePolicies?: number;
+  violations?: number;
+  lastAudit?: string;
+  threatLevel?: "none" | "low" | "medium" | "high" | "critical";
+  blockedOperations?: number;
+  conditions?: IoaCondition[];
+}
+
+export interface IoaSecurityPolicy {
+  apiVersion: "ioa.dev/v0.2";
+  kind: "SecurityPolicy";
+  metadata: IoaMetadata;
+  spec: IoaSecurityPolicySpec;
+  status?: IoaSecurityPolicyStatus;
+}
+
+// ---------------------------------------------------------------------------
+// Budget (NEW in v0.2)
+// ---------------------------------------------------------------------------
+
+export interface IoaBudgetLimitsTokens {
+  daily?: number;
+  monthly?: number;
+  quarterly?: number;
+}
+
+export interface IoaBudgetLimitsCost {
+  daily?: number;
+  monthly?: number;
+  quarterly?: number;
+  currency?: string;
+}
+
+export interface IoaBudgetLimits {
+  tokens?: IoaBudgetLimitsTokens;
+  cost?: IoaBudgetLimitsCost;
+}
+
+export interface IoaBudgetAlert {
+  threshold: number;
+  channels?: string[];
+  severity?: "info" | "warning" | "error" | "critical";
+}
+
+export interface IoaBudgetAgentAllocation {
+  name: string;
+  allocation?: number;
+}
+
+export interface IoaBudgetSpec {
+  domain: string;
+  period: string;
+  limits?: IoaBudgetLimits;
+  alerts?: IoaBudgetAlert[];
+  enforcement?: "enforce" | "warn" | "observe";
+  agents?: IoaBudgetAgentAllocation[];
+}
+
+export interface IoaBudgetStatusConsumed {
+  tokens?: number;
+  cost?: number;
+  currency?: string;
+}
+
+export interface IoaBudgetStatus {
+  consumed?: IoaBudgetStatusConsumed;
+  utilizationRate?: number;
+  alertsTriggered?: number;
+  projectedOverrun?: boolean;
+  projectedEndOfPeriod?: { tokens?: number; cost?: number };
+  conditions?: IoaCondition[];
+}
+
+export interface IoaBudget {
+  apiVersion: "ioa.dev/v0.2";
+  kind: "Budget";
+  metadata: IoaMetadata;
+  spec: IoaBudgetSpec;
+  status?: IoaBudgetStatus;
+}
+
+// ---------------------------------------------------------------------------
+// Memory (NEW in v0.2)
+// ---------------------------------------------------------------------------
+
+export interface IoaMemoryRetention {
+  duration?: string;
+  archiveAfter?: string;
+  autoExpire?: boolean;
+}
+
+export interface IoaMemoryIndexing {
+  searchable?: boolean;
+  embeddings?: boolean;
+  keywords?: string[];
+}
+
+export interface IoaMemoryReference {
+  kind: string;
+  name: string;
+}
+
+export interface IoaMemorySpec {
+  scope: "agent" | "domain" | "organization";
+  sourceAgent?: string;
+  sourceDomain?: string;
+  entryType: "decision" | "observation" | "learning" | "context" | "pattern" | "error";
+  content: string;
+  summary?: string;
+  tags?: string[];
+  retention?: IoaMemoryRetention;
+  indexing?: IoaMemoryIndexing;
+  references?: IoaMemoryReference[];
+  confidence?: number;
+  supersedes?: string;
+}
+
+export interface IoaMemoryStatus {
+  accessCount?: number;
+  lastAccessed?: string;
+  relevanceScore?: number;
+  compoundingValue?: number;
+  expiresAt?: string;
+  state?: "active" | "archived" | "expired" | "superseded";
+  conditions?: IoaCondition[];
+}
+
+export interface IoaMemory {
+  apiVersion: "ioa.dev/v0.2";
+  kind: "Memory";
+  metadata: IoaMetadata;
+  spec: IoaMemorySpec;
+  status?: IoaMemoryStatus;
+}
+
+// ---------------------------------------------------------------------------
+// Controller (NEW in v0.2 — draft)
+// ---------------------------------------------------------------------------
+
+export interface IoaControllerAction {
+  type: "alert" | "reconcile" | "pause" | "log" | "escalate" | "block";
+  severity?: "info" | "warning" | "error" | "critical";
+  channels?: string[];
+  strategy?: "gradual" | "immediate";
+  reason?: string;
+}
+
+export interface IoaControllerHook {
+  name: string;
+  action: string;
+}
+
+export interface IoaControllerSpec {
+  targetKind: string;
+  targetSelector?: {
+    matchLabels?: Record<string, string>;
+  };
+  reconcileInterval: string;
+  driftThreshold?: number;
+  actions?: {
+    onDrift?: IoaControllerAction[];
+    onError?: IoaControllerAction[];
+    onHealthy?: IoaControllerAction[];
+  };
+  hooks?: {
+    preReconcile?: IoaControllerHook[];
+    postReconcile?: IoaControllerHook[];
+  };
+  enforcementMode?: "enforce" | "warn" | "advise" | "observe";
+}
+
+export interface IoaControllerActionPerformed {
+  type: string;
+  target: string;
+  at: string;
+  result: "success" | "failure" | "skipped";
+}
+
+export interface IoaControllerStatus {
+  lastReconcile?: string;
+  reconcileCount?: number;
+  driftDetected?: boolean;
+  lastDriftAt?: string;
+  actionsPerformed?: IoaControllerActionPerformed[];
+  healthyResources?: number;
+  unhealthyResources?: number;
+  conditions?: IoaCondition[];
+}
+
+export interface IoaController {
+  apiVersion: "ioa.dev/v0.2";
+  kind: "Controller";
+  metadata: IoaMetadata;
+  spec: IoaControllerSpec;
+  status?: IoaControllerStatus;
+}
+
+// ---------------------------------------------------------------------------
 // Config (project-level, NOT a K8s-style resource)
 // ---------------------------------------------------------------------------
 
@@ -481,6 +724,9 @@ export interface IoaConfigPaths {
   telemetry?: string;
   governance?: string;
   workflows?: string;
+  security?: string;
+  budgets?: string;
+  memory?: string;
 }
 
 export interface IoaConfigOrganization {
@@ -506,4 +752,8 @@ export type IoaResource =
   | IoaDecision
   | IoaTelemetry
   | IoaGovernance
-  | IoaWorkflow;
+  | IoaWorkflow
+  | IoaSecurityPolicy
+  | IoaBudget
+  | IoaMemory
+  | IoaController;

@@ -1,0 +1,137 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://ioa.dev/schemas/v0.2/memory.json",
+  "title": "IOA Memory",
+  "description": "First-class memory/context resource with retention policies, scoping, and compounding value tracking",
+  "type": "object",
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": { "enum": ["ioa.dev/v0.2"] },
+    "kind": { "const": "Memory" },
+    "metadata": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+        "owner": {
+          "oneOf": [
+            { "type": "string" },
+            {
+              "type": "object",
+              "required": ["name"],
+              "properties": {
+                "name": { "type": "string" },
+                "role": { "type": "string" }
+              }
+            }
+          ]
+        },
+        "labels": { "type": "object", "additionalProperties": { "type": "string" } },
+        "annotations": { "type": "object", "additionalProperties": { "type": "string" } },
+        "version": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "spec": {
+      "type": "object",
+      "required": ["scope", "entryType", "content"],
+      "properties": {
+        "scope": {
+          "type": "string",
+          "enum": ["agent", "domain", "organization"],
+          "description": "Visibility scope of this memory entry"
+        },
+        "sourceAgent": {
+          "type": "string",
+          "description": "Reference to agent that created this memory"
+        },
+        "sourceDomain": {
+          "type": "string",
+          "description": "Reference to domain this memory belongs to"
+        },
+        "entryType": {
+          "type": "string",
+          "enum": ["decision", "observation", "learning", "context", "pattern", "error"],
+          "description": "Classification of memory content"
+        },
+        "content": {
+          "type": "string",
+          "description": "The memory content (text)"
+        },
+        "summary": {
+          "type": "string",
+          "description": "Short summary for indexing and search"
+        },
+        "tags": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "retention": {
+          "type": "object",
+          "properties": {
+            "duration": { "type": "string", "description": "How long to keep (e.g., '90d', '1y', 'permanent')" },
+            "archiveAfter": { "type": "string", "description": "When to move to cold storage" },
+            "autoExpire": { "type": "boolean", "default": false }
+          }
+        },
+        "indexing": {
+          "type": "object",
+          "properties": {
+            "searchable": { "type": "boolean", "default": true },
+            "embeddings": { "type": "boolean", "default": false, "description": "Whether to generate vector embeddings" },
+            "keywords": { "type": "array", "items": { "type": "string" } }
+          }
+        },
+        "references": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["kind", "name"],
+            "properties": {
+              "kind": { "type": "string", "description": "Referenced resource kind (Decision, Workflow, Agent, etc.)" },
+              "name": { "type": "string", "description": "Referenced resource name" }
+            }
+          },
+          "description": "Links to related IOA resources"
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Confidence level of this memory (0-1)"
+        },
+        "supersedes": {
+          "type": "string",
+          "description": "Name of a previous memory entry this one replaces"
+        }
+      }
+    },
+    "status": {
+      "type": "object",
+      "properties": {
+        "accessCount": { "type": "integer", "description": "Number of times this memory was retrieved" },
+        "lastAccessed": { "type": "string", "format": "date-time" },
+        "relevanceScore": { "type": "number", "minimum": 0, "maximum": 1, "description": "How relevant this memory is currently (decays over time)" },
+        "compoundingValue": { "type": "number", "minimum": 0, "description": "Value score that increases when this memory is referenced by other memories/decisions" },
+        "expiresAt": { "type": "string", "format": "date-time" },
+        "state": { "type": "string", "enum": ["active", "archived", "expired", "superseded"] },
+        "conditions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["type", "status"],
+            "properties": {
+              "type": { "type": "string" },
+              "status": { "enum": ["True", "False", "Unknown"] },
+              "reason": { "type": "string" },
+              "message": { "type": "string" },
+              "lastTransitionTime": { "type": "string", "format": "date-time" }
+            }
+          }
+        }
+      }
+    }
+  },
+  "additionalProperties": false
+}

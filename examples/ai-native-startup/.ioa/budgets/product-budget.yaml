@@ -1,0 +1,46 @@
+apiVersion: ioa.dev/v0.2
+kind: Budget
+metadata:
+  name: product-q1-budget
+  owner:
+    name: "Acme AI"
+    role: finance-lead
+spec:
+  domain: product
+  period: "2026-Q1"
+  limits:
+    tokens:
+      daily: 500000
+      monthly: 10000000
+      quarterly: 25000000
+    cost:
+      daily: 25.00
+      monthly: 500.00
+      quarterly: 1250.00
+      currency: USD
+  alerts:
+    - threshold: 0.7
+      channels:
+        - slack-finance
+      severity: info
+    - threshold: 0.9
+      channels:
+        - slack-finance
+        - email-cto
+      severity: warning
+    - threshold: 1.0
+      channels:
+        - slack-finance
+        - email-cto
+        - pagerduty
+      severity: critical
+  enforcement: warn
+  agents:
+    - name: product-analyst
+      allocation: 0.4
+    - name: insight-reporter
+      allocation: 0.2
+    - name: growth-optimizer
+      allocation: 0.25
+    - name: data-pipeline
+      allocation: 0.15

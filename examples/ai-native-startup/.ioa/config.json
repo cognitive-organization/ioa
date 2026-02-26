@@ -12,6 +12,7 @@
     "decisions": "decisions",
     "telemetry": "telemetry",
     "governance": "governance",
-    "workflows": "workflows"
+    "workflows": "workflows",
+    "memory": "memory"
   }
 }

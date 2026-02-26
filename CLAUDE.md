@@ -25,10 +25,11 @@
 - Schema IDs follow pattern: `https://ioa.dev/schemas/v0.2/{kind}.json`
 - CLI binary is `ioa` (from @ioa/cli)
 - Cross-reference validation: agents→domains, telemetry→agents, workflows→agents+domains
-- 6 resource kinds: Domain, Agent, Decision, Telemetry, Governance, Workflow
+- 11 resource kinds: Domain, Agent, Decision, Telemetry, Governance, Workflow, SecurityPolicy, Budget, Controller, Memory, Config
 
 ## CLI Commands
 - `ioa init` — scaffold .ioa/ with v0.2 templates
 - `ioa validate` — validate YAML against schemas + cross-references
 - `ioa status` — dashboard of resources in terminal
 - `ioa migrate` — migrate v0.1 resources to v0.2 format (supports --dry-run)
+- `ioa generate <type> <name>` — scaffold a new resource YAML (7 types: domain, agent, workflow, decision, security-policy, budget, memory)

@@ -1,0 +1,53 @@
+apiVersion: ioa.dev/v0.2
+kind: SecurityPolicy
+metadata:
+  name: default-security
+  owner:
+    name: "Acme AI"
+    role: security-lead
+spec:
+  domain: product
+  agentIdentity:
+    required: true
+    method: token
+  dataScopes:
+    - resource: product-catalog
+      classification: internal
+      allowedAgents:
+        - product-analyst
+      allowedOperations:
+        - read
+    - resource: user-feedback
+      classification: confidential
+      allowedAgents:
+        - product-analyst
+        - insight-reporter
+      allowedOperations:
+        - read
+    - resource: feature-flags
+      classification: internal
+      allowedAgents:
+        - product-analyst
+      allowedOperations:
+        - read
+        - write
+  zeroTrust:
+    enabled: true
+    verifyOnEveryCall: false
+    maxSessionDuration: "1h"
+  auditTrail:
+    immutable: true
+    retention: "365d"
+    events:
+      - data.accessed
+      - data.modified
+      - agent.authenticated
+      - policy.violated
+  promptInjectionDefense:
+    enabled: true
+    sanitizeInputs: true
+    detectPatterns:
+      - "ignore previous instructions"
+      - "system prompt override"
+    onDetection: block
+  enforcementMode: warn

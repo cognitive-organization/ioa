@@ -1,0 +1,133 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://ioa.dev/schemas/v0.2/budget.json",
+  "title": "IOA Budget",
+  "description": "Defines token and cost budgets per domain/agent with alerts and enforcement",
+  "type": "object",
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": { "enum": ["ioa.dev/v0.2"] },
+    "kind": { "const": "Budget" },
+    "metadata": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+        "owner": {
+          "oneOf": [
+            { "type": "string" },
+            {
+              "type": "object",
+              "required": ["name"],
+              "properties": {
+                "name": { "type": "string" },
+                "role": { "type": "string" }
+              }
+            }
+          ]
+        },
+        "labels": { "type": "object", "additionalProperties": { "type": "string" } },
+        "annotations": { "type": "object", "additionalProperties": { "type": "string" } },
+        "version": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "spec": {
+      "type": "object",
+      "required": ["domain", "period"],
+      "properties": {
+        "domain": { "type": "string", "description": "Reference to a domain name" },
+        "period": { "type": "string", "description": "Budget period (e.g., '2026-Q1', '2026-02', 'monthly')" },
+        "limits": {
+          "type": "object",
+          "properties": {
+            "tokens": {
+              "type": "object",
+              "properties": {
+                "daily": { "type": "integer" },
+                "monthly": { "type": "integer" },
+                "quarterly": { "type": "integer" }
+              }
+            },
+            "cost": {
+              "type": "object",
+              "properties": {
+                "daily": { "type": "number" },
+                "monthly": { "type": "number" },
+                "quarterly": { "type": "number" },
+                "currency": { "type": "string", "default": "USD" }
+              }
+            }
+          }
+        },
+        "alerts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["threshold"],
+            "properties": {
+              "threshold": { "type": "number", "minimum": 0, "maximum": 1, "description": "0.8 = alert at 80% utilization" },
+              "channels": { "type": "array", "items": { "type": "string" } },
+              "severity": { "type": "string", "enum": ["info", "warning", "error", "critical"] }
+            }
+          }
+        },
+        "enforcement": {
+          "type": "string",
+          "enum": ["enforce", "warn", "observe"],
+          "default": "warn"
+        },
+        "agents": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name"],
+            "properties": {
+              "name": { "type": "string" },
+              "allocation": { "type": "number", "minimum": 0, "maximum": 1, "description": "Fraction of total budget allocated to this agent" }
+            }
+          }
+        }
+      }
+    },
+    "status": {
+      "type": "object",
+      "properties": {
+        "consumed": {
+          "type": "object",
+          "properties": {
+            "tokens": { "type": "integer" },
+            "cost": { "type": "number" },
+            "currency": { "type": "string" }
+          }
+        },
+        "utilizationRate": { "type": "number", "description": "0-1, fraction of budget consumed" },
+        "alertsTriggered": { "type": "integer" },
+        "projectedOverrun": { "type": "boolean" },
+        "projectedEndOfPeriod": {
+          "type": "object",
+          "properties": {
+            "tokens": { "type": "integer" },
+            "cost": { "type": "number" }
+          }
+        },
+        "conditions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["type", "status"],
+            "properties": {
+              "type": { "type": "string" },
+              "status": { "enum": ["True", "False", "Unknown"] },
+              "reason": { "type": "string" },
+              "message": { "type": "string" },
+              "lastTransitionTime": { "type": "string", "format": "date-time" }
+            }
+          }
+        }
+      }
+    }
+  },
+  "additionalProperties": false
+}

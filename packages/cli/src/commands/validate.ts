@@ -56,6 +56,7 @@ export const validateCommand = new Command("validate")
       telemetry: "Telemetry",
       governance: "Governance",
       workflows: "Workflow",
+      memory: "Memory",
     };
 
     // Load and validate all resources

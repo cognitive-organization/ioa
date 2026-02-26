@@ -175,8 +175,10 @@
         "costConsumed": {
           "type": "object",
           "properties": {
-            "value": { "type": "number" },
-            "currency": { "type": "string" }
+            "tokens": { "type": "number" },
+            "cost": { "type": "number" },
+            "currency": { "type": "string" },
+            "period": { "type": "string" }
           }
         },
         "overrideRate": { "type": "number" },

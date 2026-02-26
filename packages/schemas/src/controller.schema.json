@@ -1,0 +1,157 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://ioa.dev/schemas/v0.2/controller.json",
+  "title": "IOA Controller",
+  "description": "Vendor-neutral controller interface for the reconciliation loop (Watch → Diff → Plan → Act → Report)",
+  "type": "object",
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": { "enum": ["ioa.dev/v0.2"] },
+    "kind": { "const": "Controller" },
+    "metadata": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+        "owner": {
+          "oneOf": [
+            { "type": "string" },
+            {
+              "type": "object",
+              "required": ["name"],
+              "properties": {
+                "name": { "type": "string" },
+                "role": { "type": "string" }
+              }
+            }
+          ]
+        },
+        "labels": { "type": "object", "additionalProperties": { "type": "string" } },
+        "annotations": { "type": "object", "additionalProperties": { "type": "string" } },
+        "version": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "spec": {
+      "type": "object",
+      "required": ["targetKind", "reconcileInterval"],
+      "properties": {
+        "targetKind": {
+          "type": "string",
+          "enum": ["Domain", "Agent", "Decision", "Telemetry", "Governance", "Workflow", "SecurityPolicy", "Budget", "Memory"]
+        },
+        "targetSelector": {
+          "type": "object",
+          "properties": {
+            "matchLabels": { "type": "object", "additionalProperties": { "type": "string" } }
+          }
+        },
+        "reconcileInterval": {
+          "type": "string",
+          "description": "Duration string (e.g., '5m', '1h', '24h')"
+        },
+        "driftThreshold": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "actions": {
+          "type": "object",
+          "properties": {
+            "onDrift": {
+              "type": "array",
+              "items": { "$ref": "#/definitions/controllerAction" }
+            },
+            "onError": {
+              "type": "array",
+              "items": { "$ref": "#/definitions/controllerAction" }
+            },
+            "onHealthy": {
+              "type": "array",
+              "items": { "$ref": "#/definitions/controllerAction" }
+            }
+          }
+        },
+        "hooks": {
+          "type": "object",
+          "properties": {
+            "preReconcile": {
+              "type": "array",
+              "items": { "$ref": "#/definitions/controllerHook" }
+            },
+            "postReconcile": {
+              "type": "array",
+              "items": { "$ref": "#/definitions/controllerHook" }
+            }
+          }
+        },
+        "enforcementMode": {
+          "type": "string",
+          "enum": ["enforce", "warn", "advise", "observe"],
+          "default": "warn"
+        }
+      }
+    },
+    "status": {
+      "type": "object",
+      "properties": {
+        "lastReconcile": { "type": "string", "format": "date-time" },
+        "reconcileCount": { "type": "integer" },
+        "driftDetected": { "type": "boolean" },
+        "lastDriftAt": { "type": "string", "format": "date-time" },
+        "actionsPerformed": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["type", "target", "at", "result"],
+            "properties": {
+              "type": { "type": "string" },
+              "target": { "type": "string" },
+              "at": { "type": "string", "format": "date-time" },
+              "result": { "enum": ["success", "failure", "skipped"] }
+            }
+          }
+        },
+        "healthyResources": { "type": "integer" },
+        "unhealthyResources": { "type": "integer" },
+        "conditions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["type", "status"],
+            "properties": {
+              "type": { "type": "string" },
+              "status": { "enum": ["True", "False", "Unknown"] },
+              "reason": { "type": "string" },
+              "message": { "type": "string" },
+              "lastTransitionTime": { "type": "string", "format": "date-time" }
+            }
+          }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "controllerAction": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": { "enum": ["alert", "reconcile", "pause", "log", "escalate", "block"] },
+        "severity": { "enum": ["info", "warning", "error", "critical"] },
+        "channels": { "type": "array", "items": { "type": "string" } },
+        "strategy": { "enum": ["gradual", "immediate"] },
+        "reason": { "type": "string" }
+      }
+    },
+    "controllerHook": {
+      "type": "object",
+      "required": ["name", "action"],
+      "properties": {
+        "name": { "type": "string" },
+        "action": { "type": "string" }
+      }
+    }
+  },
+  "additionalProperties": false
+}

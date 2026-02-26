@@ -1,0 +1,37 @@
+apiVersion: ioa.dev/v0.2
+kind: Memory
+metadata:
+  name: churn-response-optimization
+  owner:
+    name: "growth-optimizer"
+    role: agent
+spec:
+  scope: organization
+  sourceAgent: growth-optimizer
+  sourceDomain: growth
+  entryType: pattern
+  content: "High-risk churn signals (riskLevel >= 0.7) are most effectively handled with a 4-step workflow: classify → analyze → offer → deliver. Offering retention incentives within 2 hours of signal detection yields 3.2x better retention than delayed response. The fan-out pattern (parallel financial + user impact analysis) reduced total workflow time by 40%."
+  summary: "Churn response within 2h yields 3.2x better retention; fan-out pattern cuts workflow time 40%"
+  tags:
+    - churn
+    - retention
+    - workflow-optimization
+    - response-time
+  retention:
+    duration: "permanent"
+    autoExpire: false
+  indexing:
+    searchable: true
+    embeddings: true
+    keywords:
+      - churn-response
+      - retention-rate
+      - workflow-optimization
+  references:
+    - kind: Workflow
+      name: churn-response
+    - kind: Agent
+      name: growth-optimizer
+    - kind: Domain
+      name: growth
+  confidence: 0.92
