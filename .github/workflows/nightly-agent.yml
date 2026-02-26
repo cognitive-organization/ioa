@@ -186,6 +186,7 @@ jobs:
         uses: anthropics/claude-code-action@v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          github_token: ${{ secrets.GH_PAT }}
           show_full_output: true
           prompt: |
             You are a ${{ matrix.issue.agent }} agent working on issue #${{ matrix.issue.number }}: "${{ matrix.issue.title }}"
