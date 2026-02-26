@@ -33,3 +33,10 @@
 - `ioa status` — dashboard of resources in terminal
 - `ioa migrate` — migrate v0.1 resources to v0.2 format (supports --dry-run)
 - `ioa generate <type> <name>` — scaffold a new resource YAML (7 types: domain, agent, workflow, decision, security-policy, budget, memory)
+
+## Ops
+- Project Board: https://github.com/orgs/cognitive-organization/projects/1
+- Board Fields: Status (Roadmap/Backlog/Tonight/Running/Review/Done/Blocked), Priority (P0-P3), Agent (Builder/Architect/Research/Docs)
+- Nightly Agent: `.github/workflows/nightly-agent.yml` (22:00 BRT, processes Tonight queue via Claude Code Action)
+- Daily Digest: `.github/workflows/daily-digest.yml` (06:00 BRT weekdays, posts to issue #1 + Slack)
+- Secrets: ANTHROPIC_API_KEY, GH_PAT, SLACK_WEBHOOK_URL (optional)
