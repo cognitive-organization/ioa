@@ -35,6 +35,7 @@ jobs:
 
             const owner = context.repo.owner;
             const repo = context.repo.repo;
+            const repoUrl = `https://github.com/${owner}/${repo}`;
 
             // === Project Board Data via GraphQL ===
             const PROJECT_NUMBER = 1;
@@ -172,144 +173,14 @@ jobs:
               console.log('No decision issues found');
             }
 
-            // === BUILD REPORT ===
-            let body = `# CEO Cockpit — ${brtDate}\n\n`;
-
-            // Board Summary
-            body += `## Board Summary\n\n`;
-            body += `| Status | Count |\n|--------|-------|\n`;
+            // === Derived metrics ===
             const statusOrder = ['🚀 Roadmap', '🧠 Backlog', '🌙 Tonight', '⚙️ Running', '🔍 Review', '✅ Done', '⛔ Blocked'];
-            for (const s of statusOrder) {
-              if (statusCounts[s]) {
-                body += `| ${s} | ${statusCounts[s]} |\n`;
-              }
-            }
-            body += `\n`;
-
-            body += `**By Agent:**`;
             const agentEntries = Object.entries(agentCounts).sort((a, b) => b[1] - a[1]);
-            for (const [agent, count] of agentEntries) {
-              body += ` ${agent} (${count})`;
-            }
-            body += `\n\n`;
-
-            body += `**By Priority:**`;
-            for (const p of ['P0', 'P1', 'P2', 'P3']) {
-              if (priorityCounts[p]) body += ` ${p} (${priorityCounts[p]})`;
-            }
-            body += `\n\n`;
-
-            // Tonight Queue
-            body += `## 🌙 Tonight Queue (${tonightItems.length})\n\n`;
-            if (tonightItems.length === 0) {
-              body += `_Nenhuma issue programada para tonight_\n\n`;
-            } else {
-              for (const item of tonightItems) {
-                body += `- [#${item.number}](${item.url}) ${item.title} — **${item.Agent || '—'}** (${item.Priority || '—'})\n`;
-              }
-              body += `\n`;
-            }
-
-            // Running
-            if (runningItems.length > 0) {
-              body += `## ⚙️ Running (${runningItems.length})\n\n`;
-              for (const item of runningItems) {
-                body += `- [#${item.number}](${item.url}) ${item.title} — **${item.Agent || '—'}**\n`;
-              }
-              body += `\n`;
-            }
-
-            // Review
-            if (reviewItems.length > 0) {
-              body += `## 🔍 Review (${reviewItems.length})\n\n`;
-              for (const item of reviewItems) {
-                body += `- [#${item.number}](${item.url}) ${item.title}\n`;
-              }
-              body += `\n`;
-            }
-
-            // Blockers
-            body += `## ⛔ Blockers (${blockedItems.length})\n\n`;
-            if (blockedItems.length === 0) {
-              body += `_Nenhum blocker ativo_\n\n`;
-            } else {
-              for (const item of blockedItems) {
-                body += `- [#${item.number}](${item.url}) ${item.title}\n`;
-              }
-              body += `\n`;
-            }
-
-            // Decisions
-            body += `## Decisões Pendentes (${decisionIssues.length})\n\n`;
-            if (decisionIssues.length === 0) {
-              body += `_Nenhuma decisão pendente_\n\n`;
-            } else {
-              for (const i of decisionIssues) {
-                body += `- [#${i.number}](${i.html_url}) ${i.title}\n`;
-              }
-              body += `\n`;
-            }
-
-            // Issues movidas
-            body += `## Movimentação 24h\n\n`;
-            body += `**Issues abertas:** ${openedIssues.length} | **Issues fechadas:** ${closedIssues.length}\n\n`;
-            if (openedIssues.length > 0) {
-              for (const i of openedIssues) {
-                body += `- 🆕 [#${i.number}](${i.html_url}) ${i.title}\n`;
-              }
-            }
-            if (closedIssues.length > 0) {
-              for (const i of closedIssues) {
-                body += `- ✅ [#${i.number}](${i.html_url}) ${i.title}\n`;
-              }
-            }
-            if (openedIssues.length === 0 && closedIssues.length === 0) {
-              body += `_Nenhuma movimentação_\n`;
-            }
-            body += `\n`;
-
-            // Commits & PRs
-            body += `## Commits & PRs\n\n`;
-            body += `**Commits (${commits.length}):**\n`;
-            if (commits.length === 0) {
-              body += `_Nenhum commit nas últimas 24h_\n`;
-            } else {
-              for (const c of commits.slice(0, 10)) {
-                const msg = c.commit.message.split('\n')[0];
-                const sha = c.sha.substring(0, 7);
-                body += `- [\`${sha}\`](${c.html_url}) ${msg}\n`;
-              }
-              if (commits.length > 10) body += `- _... e mais ${commits.length - 10}_\n`;
-            }
-            body += `\n`;
-
-            body += `**PRs Merged (${mergedPRs.length}):**\n`;
-            if (mergedPRs.length === 0) {
-              body += `_Nenhum PR merged_\n`;
-            } else {
-              for (const pr of mergedPRs) {
-                body += `- [#${pr.number}](${pr.html_url}) ${pr.title}\n`;
-              }
-            }
-            body += `\n`;
-
-            // Metrics
             const doneCount = statusCounts['✅ Done'] || 0;
             const wipCount = (statusCounts['⚙️ Running'] || 0) + (statusCounts['🔍 Review'] || 0);
             const totalOpen = projectItems.filter(i => i.state === 'OPEN').length;
 
-            body += `## Métricas\n\n`;
-            body += `| Métrica | Valor |\n|---------|-------|\n`;
-            body += `| Done (total) | ${doneCount} |\n`;
-            body += `| WIP (Running + Review) | ${wipCount} |\n`;
-            body += `| Blocked | ${blockedItems.length} |\n`;
-            body += `| Tonight Queue | ${tonightItems.length} |\n`;
-            body += `| Total Open | ${totalOpen} |\n`;
-            body += `| Closed 24h | ${closedIssues.length} |\n`;
-            body += `\n`;
-
-            // CEO Action Items
-            body += `## 🎯 Ações Sugeridas para Hoje\n\n`;
+            // === CEO Action Items ===
             const actions = [];
 
             if (blockedItems.length > 0) {
@@ -337,14 +208,220 @@ jobs:
               actions.push(`✅ **Tudo fluindo bem.** Board saudável, sem ações urgentes.`);
             }
 
-            for (const action of actions) {
-              body += `${action}\n\n`;
+            // === Focus ===
+            const p0Open = projectItems.filter(i =>
+              i.state === 'OPEN' && i.Priority === 'P0' && !(i.Status || '').includes('Blocked')
+            );
+            const p0Blocked = projectItems.filter(i =>
+              i.Priority === 'P0' && (i.Status || '').includes('Blocked')
+            );
+
+            // === BUILD GITHUB MARKDOWN REPORT ===
+            let body = `# CEO Cockpit — ${brtDate}\n\n`;
+
+            body += `## Board Summary\n\n`;
+            body += `| Status | Count |\n|--------|-------|\n`;
+            for (const s of statusOrder) {
+              if (statusCounts[s]) body += `| ${s} | ${statusCounts[s]} |\n`;
             }
+            body += `\n`;
+
+            body += `**By Agent:**`;
+            for (const [agent, count] of agentEntries) body += ` ${agent} (${count})`;
+            body += `\n\n`;
+
+            body += `**By Priority:**`;
+            for (const p of ['P0', 'P1', 'P2', 'P3']) {
+              if (priorityCounts[p]) body += ` ${p} (${priorityCounts[p]})`;
+            }
+            body += `\n\n`;
+
+            body += `## 🌙 Tonight Queue (${tonightItems.length})\n\n`;
+            if (tonightItems.length === 0) {
+              body += `_Nenhuma issue programada para tonight_\n\n`;
+            } else {
+              for (const item of tonightItems) body += `- [#${item.number}](${item.url}) ${item.title} — **${item.Agent || '—'}** (${item.Priority || '—'})\n`;
+              body += `\n`;
+            }
+
+            if (runningItems.length > 0) {
+              body += `## ⚙️ Running (${runningItems.length})\n\n`;
+              for (const item of runningItems) body += `- [#${item.number}](${item.url}) ${item.title} — **${item.Agent || '—'}**\n`;
+              body += `\n`;
+            }
+
+            if (reviewItems.length > 0) {
+              body += `## 🔍 Review (${reviewItems.length})\n\n`;
+              for (const item of reviewItems) body += `- [#${item.number}](${item.url}) ${item.title}\n`;
+              body += `\n`;
+            }
+
+            body += `## ⛔ Blockers (${blockedItems.length})\n\n`;
+            if (blockedItems.length === 0) {
+              body += `_Nenhum blocker ativo_\n\n`;
+            } else {
+              for (const item of blockedItems) body += `- [#${item.number}](${item.url}) ${item.title}\n`;
+              body += `\n`;
+            }
+
+            body += `## Movimentação 24h\n\n`;
+            body += `**Issues abertas:** ${openedIssues.length} | **Issues fechadas:** ${closedIssues.length}\n\n`;
+            for (const i of openedIssues) body += `- 🆕 [#${i.number}](${i.html_url}) ${i.title}\n`;
+            for (const i of closedIssues) body += `- ✅ [#${i.number}](${i.html_url}) ${i.title}\n`;
+            if (openedIssues.length === 0 && closedIssues.length === 0) body += `_Nenhuma movimentação_\n`;
+            body += `\n`;
+
+            body += `## Commits & PRs\n\n`;
+            body += `**Commits (${commits.length}):**\n`;
+            if (commits.length === 0) { body += `_Nenhum commit nas últimas 24h_\n`; }
+            else {
+              for (const c of commits.slice(0, 10)) {
+                body += `- [\`${c.sha.substring(0, 7)}\`](${c.html_url}) ${c.commit.message.split('\n')[0]}\n`;
+              }
+              if (commits.length > 10) body += `- _... e mais ${commits.length - 10}_\n`;
+            }
+            body += `\n`;
+
+            body += `**PRs Merged (${mergedPRs.length}):**\n`;
+            if (mergedPRs.length === 0) { body += `_Nenhum PR merged_\n`; }
+            else { for (const pr of mergedPRs) body += `- [#${pr.number}](${pr.html_url}) ${pr.title}\n`; }
+            body += `\n`;
+
+            body += `## Métricas\n\n`;
+            body += `| Métrica | Valor |\n|---------|-------|\n`;
+            body += `| Done (total) | ${doneCount} |\n`;
+            body += `| WIP (Running + Review) | ${wipCount} |\n`;
+            body += `| Blocked | ${blockedItems.length} |\n`;
+            body += `| Tonight Queue | ${tonightItems.length} |\n`;
+            body += `| Total Open | ${totalOpen} |\n`;
+            body += `| Closed 24h | ${closedIssues.length} |\n\n`;
+
+            body += `## 🎯 Ações Sugeridas para Hoje\n\n`;
+            for (const action of actions) body += `${action}\n\n`;
 
             body += `---\n_CEO Cockpit gerado automaticamente às ${now.toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo' })} BRT_`;
 
-            // Save report to file for Slack step
+            // === BUILD SLACK BLOCKS (native mrkdwn, no markdown tables) ===
             const fs = require('fs');
+            const slackLink = (url, text) => `<${url}|${text}>`;
+            const slackIssue = (item) => slackLink(item.url || `${repoUrl}/issues/${item.number}`, `#${item.number}`);
+
+            const blocks = [];
+
+            // Header
+            blocks.push({ type: 'header', text: { type: 'plain_text', text: `IOA CEO Cockpit — ${brtDate}`, emoji: true } });
+
+            // Board summary as compact text
+            let boardText = '';
+            for (const s of statusOrder) {
+              if (statusCounts[s]) boardText += `${s}  *${statusCounts[s]}*\n`;
+            }
+            const agentStr = agentEntries.map(([a, c]) => `${a} (${c})`).join(' · ');
+            const prioStr = ['P0', 'P1', 'P2', 'P3'].filter(p => priorityCounts[p]).map(p => `*${p}* ${priorityCounts[p]}`).join('  ');
+            boardText += `\n*Agents:* ${agentStr}\n*Priority:* ${prioStr}`;
+            blocks.push({ type: 'section', text: { type: 'mrkdwn', text: boardText } });
+            blocks.push({ type: 'divider' });
+
+            // Metrics bar
+            const metricsText = `:white_check_mark: Done *${doneCount}*    :gear: WIP *${wipCount}*    :no_entry: Blocked *${blockedItems.length}*    :crescent_moon: Tonight *${tonightItems.length}*    :bar_chart: Open *${totalOpen}*    :chart_with_upwards_trend: Closed 24h *${closedIssues.length}*`;
+            blocks.push({ type: 'section', text: { type: 'mrkdwn', text: metricsText } });
+            blocks.push({ type: 'divider' });
+
+            // Tonight queue
+            if (tonightItems.length > 0) {
+              let tText = `:crescent_moon: *Tonight Queue (${tonightItems.length})*\n`;
+              for (const item of tonightItems) {
+                tText += `${slackIssue(item)} ${item.title} — *${item.Agent || '—'}* (${item.Priority || '—'})\n`;
+              }
+              blocks.push({ type: 'section', text: { type: 'mrkdwn', text: tText } });
+            }
+
+            // Running
+            if (runningItems.length > 0) {
+              let rText = `:gear: *Running (${runningItems.length})*\n`;
+              for (const item of runningItems) {
+                rText += `${slackIssue(item)} ${item.title} — *${item.Agent || '—'}*\n`;
+              }
+              blocks.push({ type: 'section', text: { type: 'mrkdwn', text: rText } });
+            }
+
+            // Review
+            if (reviewItems.length > 0) {
+              let rvText = `:mag: *Review (${reviewItems.length})*\n`;
+              for (const item of reviewItems) {
+                rvText += `${slackIssue(item)} ${item.title}\n`;
+              }
+              blocks.push({ type: 'section', text: { type: 'mrkdwn', text: rvText } });
+            }
+
+            // Blockers
+            if (blockedItems.length > 0) {
+              blocks.push({ type: 'divider' });
+              let bText = `:no_entry: *Blockers (${blockedItems.length})*\n`;
+              for (const item of blockedItems) {
+                const tags = item.labels.filter(l => l.startsWith('status:')).map(l => `\`${l}\``).join(' ');
+                bText += `${slackIssue(item)} ${item.title} ${tags}\n`;
+              }
+              blocks.push({ type: 'section', text: { type: 'mrkdwn', text: bText } });
+            }
+
+            blocks.push({ type: 'divider' });
+
+            // Actions
+            let actText = `:dart: *Acoes para Hoje*\n`;
+            for (const action of actions) {
+              actText += action.replace(/\*\*(.+?)\*\*/g, '*$1*') + '\n';
+            }
+            blocks.push({ type: 'section', text: { type: 'mrkdwn', text: actText } });
+
+            // Focus
+            let focusText = `:trophy: *Foco do Dia*\n`;
+            if (p0Blocked.length > 0 && p0Open.length <= 2) {
+              focusText += `*Desbloquear > Construir.* ${p0Blocked.length} P0 blocked:\n`;
+              for (const item of p0Blocked) {
+                const reason = item.labels.filter(l => l.startsWith('status:')).join(', ') || 'verificar motivo';
+                focusText += `${slackIssue(item)} ${item.title} — _${reason}_\n`;
+              }
+            } else if (p0Open.length > 0) {
+              focusText += `*Executar P0s.* ${p0Open.length} desbloqueadas:\n`;
+              for (const item of p0Open.slice(0, 5)) {
+                focusText += `${slackIssue(item)} ${item.title}\n`;
+              }
+            } else {
+              focusText += `Todos P0 resolvidos. Avancar nos P1.\n`;
+            }
+            blocks.push({ type: 'section', text: { type: 'mrkdwn', text: focusText } });
+
+            // Activity (condensed)
+            if (commits.length > 0 || mergedPRs.length > 0 || openedIssues.length > 0 || closedIssues.length > 0) {
+              blocks.push({ type: 'divider' });
+              let activityText = `:scroll: *Atividade 24h* — ${commits.length} commits · ${mergedPRs.length} PRs merged · ${openedIssues.length} abertas · ${closedIssues.length} fechadas\n`;
+              if (mergedPRs.length > 0) {
+                for (const pr of mergedPRs) {
+                  activityText += `:merged: ${slackLink(pr.html_url, `#${pr.number}`)} ${pr.title}\n`;
+                }
+              }
+              if (commits.length > 0) {
+                for (const c of commits.slice(0, 5)) {
+                  activityText += `\`${c.sha.substring(0, 7)}\` ${c.commit.message.split('\n')[0]}\n`;
+                }
+                if (commits.length > 5) activityText += `_... e mais ${commits.length - 5} commits_\n`;
+              }
+              blocks.push({ type: 'section', text: { type: 'mrkdwn', text: activityText.substring(0, 3000) } });
+            }
+
+            // Footer
+            const brtTime = now.toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+            blocks.push({ type: 'context', elements: [{ type: 'mrkdwn', text: `IOA CEO Cockpit gerado as ${brtTime} BRT · ${slackLink(`https://github.com/orgs/cognitive-organization/projects/1`, 'Board')} · ${slackLink(`${repoUrl}/issues/1`, 'Digest Log')}` }] });
+
+            // Save Slack payload
+            const slackPayload = JSON.stringify({
+              text: `IOA CEO Cockpit — ${brtDate}`,
+              blocks: blocks.slice(0, 50)
+            });
+            fs.writeFileSync('slack-payload.json', slackPayload);
+
+            // Save GitHub markdown report
             fs.writeFileSync('digest-report.md', body);
             core.setOutput('report_date', brtDate);
 
@@ -362,44 +439,6 @@ jobs:
           HAS_SLACK: ${{ secrets.SLACK_WEBHOOK_URL != '' }}
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         run: |
-          export TITLE="IOA CEO Cockpit — ${{ steps.report.outputs.report_date }}"
-
-          # Split report into chunks respecting Slack's 3000 char section limit
-          python3 - <<'PYEOF'
-          import json, os
-
-          with open('digest-report.md', 'r') as f:
-              report = f.read()
-
-          title = os.environ['TITLE']
-          blocks = [
-              {"type": "header", "text": {"type": "plain_text", "text": title[:150]}}
-          ]
-
-          # Split by ## headings to keep sections together
-          sections = report.split('\n## ')
-          chunks = []
-          current = ''
-          for i, section in enumerate(sections):
-              piece = section if i == 0 else f'## {section}'
-              if len(current) + len(piece) > 2900:
-                  if current:
-                      chunks.append(current)
-                  current = piece[:2900]
-              else:
-                  current += piece
-          if current:
-              chunks.append(current)
-
-          for chunk in chunks:
-              blocks.append({"type": "section", "text": {"type": "mrkdwn", "text": chunk[:3000]}})
-              blocks.append({"type": "divider"})
-
-          payload = json.dumps({"text": title, "blocks": blocks[:50]})
-          with open('slack-payload.json', 'w') as f:
-              f.write(payload)
-          PYEOF
-
           RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$SLACK_WEBHOOK_URL" \
             -H 'Content-Type: application/json' \
             -d @slack-payload.json)
@@ -410,4 +449,5 @@ jobs:
 
           if [ "$BODY" != "ok" ]; then
             echo "::warning::Slack delivery failed: $BODY"
+            exit 1
           fi
