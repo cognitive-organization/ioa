@@ -232,7 +232,7 @@ jobs:
             - Also write a GitHub markdown version to cockpit-report-github.md.
           claude_args: |
             --max-turns 25
-            --allowedTools Read,Glob,Grep,Bash(gh issue list:gh api:curl:cat:echo)
+            --allowedTools Read,Write,Glob,Grep,Bash(gh issue list:gh api:curl:cat:echo)
 
       - name: Upload report artifact
         if: always()

@@ -234,7 +234,7 @@ jobs:
             Write a GitHub markdown version to portfolio-report-github.md.
           claude_args: |
             --max-turns 20
-            --allowedTools Read,Glob,Grep,Bash(gh issue list:gh api:cat:echo)
+            --allowedTools Read,Write,Glob,Grep,Bash(gh issue list:gh api:curl:cat:echo)
 
       - name: Upload report artifact
         if: always()
