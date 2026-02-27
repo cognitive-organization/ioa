@@ -1,0 +1,312 @@
+name: Portfolio Manager — Operational Health
+
+on:
+  schedule:
+    # 06:15 BRT = 09:15 UTC, daily (including weekends)
+    - cron: '15 9 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: portfolio-report
+  cancel-in-progress: true
+
+permissions:
+  issues: write
+  contents: read
+  pull-requests: read
+
+jobs:
+  gather:
+    runs-on: ubuntu-latest
+    outputs:
+      data: ${{ steps.collect.outputs.data }}
+    steps:
+      - name: Collect operational data from all repos
+        id: collect
+        uses: actions/github-script@v8
+        with:
+          github-token: ${{ secrets.GH_PAT }}
+          script: |
+            const fs = require('fs');
+            const now = new Date();
+            const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+            const threeDaysAgo = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000);
+            const since7d = sevenDaysAgo.toISOString();
+
+            const repos = [
+              { full: 'paribali-labs/finanfix', alias: 'FINANFIX' },
+              { full: 'paribali-labs/creator-copilot', alias: 'CREAOS' },
+              { full: 'cognitive-organization/ioa', alias: 'IOA' }
+            ];
+
+            const data = {};
+
+            for (const r of repos) {
+              const [owner, repo] = r.full.split('/');
+              const repoData = {
+                alias: r.alias,
+                fullRepo: r.full,
+                velocity: 0,
+                prsMerged: 0,
+                openIssues: 0,
+                closedIssues7d: [],
+                recentCommits: 0,
+                board: []
+              };
+
+              // Open issues count
+              try {
+                const { data: issues } = await github.rest.issues.listForRepo({
+                  owner, repo, state: 'open', per_page: 100
+                });
+                repoData.openIssues = issues.filter(i => !i.pull_request).length;
+              } catch (e) { /* skip */ }
+
+              // Closed issues (7d) for velocity
+              try {
+                const { data: issues } = await github.rest.issues.listForRepo({
+                  owner, repo, state: 'closed', since: since7d, sort: 'updated', per_page: 100
+                });
+                const closed = issues.filter(i =>
+                  !i.pull_request && i.closed_at && new Date(i.closed_at) > sevenDaysAgo
+                );
+                repoData.velocity = closed.length;
+                repoData.closedIssues7d = closed.map(i => ({
+                  number: i.number,
+                  title: i.title,
+                  createdAt: i.created_at,
+                  closedAt: i.closed_at
+                }));
+              } catch (e) { /* skip */ }
+
+              // Merged PRs (7d)
+              try {
+                const { data: prs } = await github.rest.pulls.list({
+                  owner, repo, state: 'closed', sort: 'updated', direction: 'desc', per_page: 30
+                });
+                repoData.prsMerged = prs.filter(pr =>
+                  pr.merged_at && new Date(pr.merged_at) > sevenDaysAgo
+                ).length;
+              } catch (e) { /* skip */ }
+
+              // Recent commits (7d)
+              try {
+                const { data: commits } = await github.rest.repos.listCommits({
+                  owner, repo, since: since7d, per_page: 50
+                });
+                repoData.recentCommits = commits.length;
+              } catch (e) { /* skip */ }
+
+              data[r.alias] = repoData;
+            }
+
+            // Query IOA board
+            try {
+              const result = await github.graphql(`
+                query($owner: String!, $number: Int!) {
+                  organization(login: $owner) {
+                    projectV2(number: $number) {
+                      items(first: 100) {
+                        nodes {
+                          fieldValues(first: 10) {
+                            nodes {
+                              ... on ProjectV2ItemFieldSingleSelectValue {
+                                name
+                                field { ... on ProjectV2SingleSelectField { name } }
+                              }
+                            }
+                          }
+                          content {
+                            ... on Issue { number title state updatedAt }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              `, { owner: 'cognitive-organization', number: 1 });
+
+              data['IOA'].board = result.organization.projectV2.items.nodes
+                .filter(n => n.content && n.content.number)
+                .map(n => {
+                  const status = n.fieldValues.nodes.find(f => f.field && f.field.name === 'Status');
+                  return {
+                    number: n.content.number,
+                    title: n.content.title,
+                    state: n.content.state,
+                    updatedAt: n.content.updatedAt,
+                    status: status ? status.name : 'Unknown'
+                  };
+                });
+            } catch (e) { console.log(`IOA board: ${e.message}`); }
+
+            // Query Paribali board
+            try {
+              const result = await github.graphql(`
+                query($owner: String!, $number: Int!) {
+                  user(login: $owner) {
+                    projectV2(number: $number) {
+                      items(first: 100) {
+                        nodes {
+                          fieldValues(first: 10) {
+                            nodes {
+                              ... on ProjectV2ItemFieldSingleSelectValue {
+                                name
+                                field { ... on ProjectV2SingleSelectField { name } }
+                              }
+                            }
+                          }
+                          content {
+                            ... on Issue {
+                              number title state updatedAt
+                              repository { nameWithOwner }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              `, { owner: 'paribali', number: 2 });
+
+              const allItems = result.user.projectV2.items.nodes
+                .filter(n => n.content && n.content.number)
+                .map(n => {
+                  const status = n.fieldValues.nodes.find(f => f.field && f.field.name === 'Status');
+                  return {
+                    number: n.content.number,
+                    title: n.content.title,
+                    state: n.content.state,
+                    updatedAt: n.content.updatedAt,
+                    repo: n.content.repository ? n.content.repository.nameWithOwner : '',
+                    status: status ? status.name : 'Unknown'
+                  };
+                });
+
+              data['FINANFIX'].board = allItems.filter(i => i.repo === 'paribali-labs/finanfix');
+              data['CREAOS'].board = allItems.filter(i => i.repo === 'paribali-labs/creator-copilot');
+            } catch (e) { console.log(`Paribali board: ${e.message}`); }
+
+            fs.writeFileSync('portfolio-data.json', JSON.stringify(data, null, 2));
+            core.setOutput('data', 'collected');
+            console.log('Portfolio data collected');
+
+      - name: Upload data artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: portfolio-data
+          path: portfolio-data.json
+          retention-days: 1
+
+  analyze:
+    needs: gather
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download data artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: portfolio-data
+
+      - name: Analyze with Claude
+        id: claude
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          github_token: ${{ secrets.GH_PAT }}
+          show_full_output: true
+          prompt: |
+            You are the Portfolio Manager agent for Paribali Holding.
+
+            Read your full instructions:
+            cat agents/holding/prompts/portfolio-manager.md
+
+            Read the collected data:
+            cat portfolio-data.json
+
+            Analyze the data and produce the operational health report.
+            Calculate all metrics: velocity, throughput, open issues, blocked count, stale count.
+            Identify bottlenecks and stale initiatives.
+
+            Write the Slack report to portfolio-report.txt (mrkdwn format).
+            Write a GitHub markdown version to portfolio-report-github.md.
+          claude_args: |
+            --max-turns 20
+            --allowedTools Read,Glob,Grep,Bash(gh issue list:gh api:cat:echo)
+
+      - name: Upload report artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: portfolio-report
+          path: |
+            portfolio-report.txt
+            portfolio-report-github.md
+          retention-days: 7
+
+  report:
+    needs: [gather, analyze]
+    if: always() && needs.gather.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download report artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: portfolio-report
+        continue-on-error: true
+
+      - name: Post to Slack
+        if: always()
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          if [ -z "$SLACK_WEBHOOK_URL" ]; then
+            echo "::warning::SLACK_WEBHOOK_URL not set — skipping Slack"
+            exit 0
+          fi
+
+          REPORT=""
+          if [ -f portfolio-report.txt ]; then
+            REPORT=$(cat portfolio-report.txt)
+          else
+            REPORT="Portfolio Manager report generation failed. Check GitHub Actions."
+          fi
+
+          REPORT_ESCAPED=$(echo "$REPORT" | python3 -c 'import sys,json; print(json.dumps(sys.stdin.read()))')
+
+          PAYLOAD=$(cat <<EOF
+          {
+            "text": "Portfolio Manager — Operational Health",
+            "blocks": [
+              {
+                "type": "section",
+                "text": {
+                  "type": "mrkdwn",
+                  "text": ${REPORT_ESCAPED}
+                }
+              }
+            ]
+          }
+          EOF
+          )
+
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$SLACK_WEBHOOK_URL" \
+            -H 'Content-Type: application/json' \
+            -d "$PAYLOAD")
+
+          HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+          BODY=$(echo "$RESPONSE" | head -1)
+          echo "Slack response: $HTTP_CODE — $BODY"
+
+      - name: Write step summary
+        if: always()
+        run: |
+          if [ -f portfolio-report-github.md ]; then
+            cat portfolio-report-github.md >> $GITHUB_STEP_SUMMARY
+          else
+            echo "## Portfolio Manager — Operational Health" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Report generation failed. Check workflow logs." >> $GITHUB_STEP_SUMMARY
+          fi

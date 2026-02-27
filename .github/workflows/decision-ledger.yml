@@ -1,0 +1,203 @@
+name: Decision Ledger — Forensic Capture
+
+on:
+  schedule:
+    # 23:00 BRT = 02:00 UTC (next day)
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: decision-ledger
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+  issues: read
+  pull-requests: read
+
+jobs:
+  gather:
+    runs-on: ubuntu-latest
+    outputs:
+      data: ${{ steps.collect.outputs.data }}
+      has_activity: ${{ steps.collect.outputs.has_activity }}
+    steps:
+      - name: Collect 24h activity from all repos
+        id: collect
+        uses: actions/github-script@v8
+        with:
+          github-token: ${{ secrets.GH_PAT }}
+          script: |
+            const fs = require('fs');
+            const now = new Date();
+            const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+            const since = yesterday.toISOString();
+
+            const repos = [
+              { full: 'paribali-labs/finanfix', alias: 'FINANFIX' },
+              { full: 'paribali-labs/creator-copilot', alias: 'CREAOS' },
+              { full: 'cognitive-organization/ioa', alias: 'IOA' }
+            ];
+
+            const data = { date: now.toISOString().split('T')[0], repos: {} };
+            let totalActivity = 0;
+
+            for (const r of repos) {
+              const [owner, repo] = r.full.split('/');
+              const repoData = { commits: [], mergedPRs: [], issueComments: [], issueEvents: [] };
+
+              // Commits
+              try {
+                const { data: commits } = await github.rest.repos.listCommits({
+                  owner, repo, since, per_page: 30
+                });
+                repoData.commits = commits.map(c => ({
+                  sha: c.sha,
+                  message: c.commit.message,
+                  author: c.commit.author.name,
+                  date: c.commit.author.date,
+                  url: c.html_url
+                }));
+                totalActivity += commits.length;
+              } catch (e) { /* skip */ }
+
+              // Merged PRs
+              try {
+                const { data: prs } = await github.rest.pulls.list({
+                  owner, repo, state: 'closed', sort: 'updated', direction: 'desc', per_page: 10
+                });
+                repoData.mergedPRs = prs
+                  .filter(pr => pr.merged_at && new Date(pr.merged_at) > yesterday)
+                  .map(pr => ({
+                    number: pr.number,
+                    title: pr.title,
+                    body: (pr.body || '').substring(0, 500),
+                    mergedAt: pr.merged_at,
+                    url: pr.html_url
+                  }));
+                totalActivity += repoData.mergedPRs.length;
+              } catch (e) { /* skip */ }
+
+              // Issue comments (from agents and humans)
+              try {
+                const { data: comments } = await github.rest.issues.listCommentsForRepo({
+                  owner, repo, since, sort: 'updated', direction: 'desc', per_page: 30
+                });
+                repoData.issueComments = comments
+                  .filter(c => new Date(c.created_at) > yesterday)
+                  .map(c => ({
+                    issueUrl: c.issue_url,
+                    body: (c.body || '').substring(0, 300),
+                    user: c.user.login,
+                    createdAt: c.created_at
+                  }));
+              } catch (e) { /* skip */ }
+
+              // Issue events (label changes, closures)
+              try {
+                const { data: events } = await github.rest.issues.listEventsForRepo({
+                  owner, repo, per_page: 30
+                });
+                repoData.issueEvents = events
+                  .filter(e => new Date(e.created_at) > yesterday)
+                  .filter(e => ['labeled', 'unlabeled', 'closed', 'reopened'].includes(e.event))
+                  .map(e => ({
+                    event: e.event,
+                    issueNumber: e.issue ? e.issue.number : null,
+                    label: e.label ? e.label.name : null,
+                    createdAt: e.created_at
+                  }));
+              } catch (e) { /* skip */ }
+
+              data.repos[r.alias] = repoData;
+            }
+
+            fs.writeFileSync('activity-data.json', JSON.stringify(data, null, 2));
+            core.setOutput('data', 'collected');
+            core.setOutput('has_activity', totalActivity > 0 ? 'true' : 'false');
+            console.log(`Total activity items: ${totalActivity}`);
+
+      - name: Upload data artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: activity-data
+          path: activity-data.json
+          retention-days: 1
+
+  record:
+    needs: gather
+    if: needs.gather.outputs.has_activity == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GH_PAT }}
+
+      - name: Download data artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: activity-data
+
+      - name: Extract and record decisions with Claude
+        id: claude
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          github_token: ${{ secrets.GH_PAT }}
+          show_full_output: true
+          prompt: |
+            You are the Decision Ledger agent for Paribali Holding.
+
+            Read your full instructions:
+            cat agents/holding/prompts/decision-ledger.md
+
+            Read the collected activity data:
+            cat activity-data.json
+
+            Your task:
+            1. Analyze all commits, merged PRs, issue comments, and issue events across all 3 repos.
+            2. Extract decisions that were made (architecture, technology, priority, scope, strategic, process).
+            3. Check if memory/decisions/ directory exists. Create it if not.
+            4. Check if the monthly file exists (e.g., memory/decisions/2026-02.md). If not, create it with a header.
+            5. Read the existing monthly file to avoid duplicates.
+            6. Append new decision records in the DEC-YYYY-MM-DD-NNN format.
+            7. If no decisions were found, append a single line: "_No decisions detected for {date}._"
+
+            IMPORTANT:
+            - Use the exact DEC format from your prompt.
+            - Never duplicate a decision already in the file.
+            - Do NOT record routine commits (typo fixes, version bumps).
+            - After writing decisions, commit with: git add memory/decisions/ && git commit -m "chore: record decisions for $(date +%Y-%m-%d) [skip ci]"
+            - Then push: git push origin main
+          claude_args: |
+            --max-turns 25
+            --allowedTools Edit,Read,Write,Glob,Grep,Bash(gh issue list:gh api:git add:git commit:git push:git status:git diff:cat:echo:date:mkdir:ls)
+
+      - name: Write step summary
+        if: always()
+        run: |
+          echo "## Decision Ledger" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          DATE=$(date +%Y-%m)
+          FILE="memory/decisions/${DATE}.md"
+
+          if [ -f "$FILE" ]; then
+            echo "Decisions recorded in \`$FILE\`:" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            cat "$FILE" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "No decisions file created." >> $GITHUB_STEP_SUMMARY
+          fi
+
+  skip:
+    needs: gather
+    if: needs.gather.outputs.has_activity != 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: No activity detected
+        run: |
+          echo "## Decision Ledger" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "No activity detected across any repo in the last 24 hours. Nothing to record." >> $GITHUB_STEP_SUMMARY

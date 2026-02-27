@@ -1,0 +1,342 @@
+name: Executive Cockpit — Holding Briefing
+
+on:
+  schedule:
+    # 06:00 BRT = 09:00 UTC, weekdays only
+    - cron: '0 9 * * 1-5'
+  workflow_dispatch:
+
+concurrency:
+  group: executive-cockpit
+  cancel-in-progress: true
+
+permissions:
+  issues: write
+  contents: read
+  pull-requests: read
+
+env:
+  REPOS: '["paribali-labs/finanfix","paribali-labs/creator-copilot","cognitive-organization/ioa"]'
+  REPO_ALIASES: '{"paribali-labs/finanfix":"FINANFIX","paribali-labs/creator-copilot":"CREAOS","cognitive-organization/ioa":"IOA"}'
+
+jobs:
+  gather:
+    runs-on: ubuntu-latest
+    outputs:
+      data: ${{ steps.collect.outputs.data }}
+    steps:
+      - name: Collect cross-project data
+        id: collect
+        uses: actions/github-script@v8
+        with:
+          github-token: ${{ secrets.GH_PAT }}
+          script: |
+            const now = new Date();
+            const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+            const since = yesterday.toISOString();
+            const repos = JSON.parse(process.env.REPOS);
+            const aliases = JSON.parse(process.env.REPO_ALIASES);
+
+            const data = {};
+
+            for (const fullRepo of repos) {
+              const [owner, repo] = fullRepo.split('/');
+              const alias = aliases[fullRepo];
+              const repoData = { alias, fullRepo, commits: [], openIssues: [], mergedPRs: [], workflowRuns: [], board: {} };
+
+              // Recent commits
+              try {
+                const { data: commits } = await github.rest.repos.listCommits({
+                  owner, repo, since, per_page: 20
+                });
+                repoData.commits = commits.map(c => ({
+                  sha: c.sha.substring(0, 7),
+                  message: c.commit.message.split('\n')[0],
+                  date: c.commit.author.date
+                }));
+              } catch (e) { console.log(`${alias}: no commits — ${e.message}`); }
+
+              // Open issues
+              try {
+                const { data: issues } = await github.rest.issues.listForRepo({
+                  owner, repo, state: 'open', per_page: 100
+                });
+                repoData.openIssues = issues.filter(i => !i.pull_request).map(i => ({
+                  number: i.number,
+                  title: i.title,
+                  labels: i.labels.map(l => l.name)
+                }));
+              } catch (e) { console.log(`${alias}: no issues — ${e.message}`); }
+
+              // Merged PRs (last 24h)
+              try {
+                const { data: prs } = await github.rest.pulls.list({
+                  owner, repo, state: 'closed', sort: 'updated', direction: 'desc', per_page: 10
+                });
+                repoData.mergedPRs = prs
+                  .filter(pr => pr.merged_at && new Date(pr.merged_at) > yesterday)
+                  .map(pr => ({ number: pr.number, title: pr.title }));
+              } catch (e) { console.log(`${alias}: no PRs — ${e.message}`); }
+
+              // Workflow runs (for cost estimation)
+              try {
+                const { data: runs } = await github.rest.actions.listWorkflowRunsForRepo({
+                  owner, repo, per_page: 20
+                });
+                const recentRuns = runs.workflow_runs.filter(r =>
+                  new Date(r.created_at) > yesterday
+                );
+                repoData.workflowRuns = recentRuns.map(r => ({
+                  name: r.name,
+                  status: r.status,
+                  conclusion: r.conclusion
+                }));
+              } catch (e) { console.log(`${alias}: no workflow runs — ${e.message}`); }
+
+              data[alias] = repoData;
+            }
+
+            // Query IOA board (org-owned)
+            try {
+              const ioaBoard = await github.graphql(`
+                query($owner: String!, $number: Int!) {
+                  organization(login: $owner) {
+                    projectV2(number: $number) {
+                      items(first: 100) {
+                        nodes {
+                          fieldValues(first: 10) {
+                            nodes {
+                              ... on ProjectV2ItemFieldSingleSelectValue {
+                                name
+                                field { ... on ProjectV2SingleSelectField { name } }
+                              }
+                            }
+                          }
+                          content {
+                            ... on Issue { number title state }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              `, { owner: 'cognitive-organization', number: 1 });
+
+              const items = ioaBoard.organization.projectV2.items.nodes
+                .filter(n => n.content && n.content.number)
+                .map(n => {
+                  const status = n.fieldValues.nodes.find(f => f.field && f.field.name === 'Status');
+                  return { number: n.content.number, title: n.content.title, state: n.content.state, status: status ? status.name : 'Unknown' };
+                });
+              data['IOA'].board = { items };
+            } catch (e) { console.log(`IOA board query failed: ${e.message}`); }
+
+            // Query Paribali board (user-owned, shared by finanfix + creator-copilot)
+            try {
+              const pariBoard = await github.graphql(`
+                query($owner: String!, $number: Int!) {
+                  user(login: $owner) {
+                    projectV2(number: $number) {
+                      items(first: 100) {
+                        nodes {
+                          fieldValues(first: 10) {
+                            nodes {
+                              ... on ProjectV2ItemFieldSingleSelectValue {
+                                name
+                                field { ... on ProjectV2SingleSelectField { name } }
+                              }
+                            }
+                          }
+                          content {
+                            ... on Issue {
+                              number title state
+                              repository { nameWithOwner }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              `, { owner: 'paribali', number: 2 });
+
+              const allItems = pariBoard.user.projectV2.items.nodes
+                .filter(n => n.content && n.content.number)
+                .map(n => {
+                  const status = n.fieldValues.nodes.find(f => f.field && f.field.name === 'Status');
+                  return {
+                    number: n.content.number,
+                    title: n.content.title,
+                    state: n.content.state,
+                    repo: n.content.repository ? n.content.repository.nameWithOwner : '',
+                    status: status ? status.name : 'Unknown'
+                  };
+                });
+
+              const finanfixItems = allItems.filter(i => i.repo === 'paribali-labs/finanfix');
+              const creaosItems = allItems.filter(i => i.repo === 'paribali-labs/creator-copilot');
+              data['FINANFIX'].board = { items: finanfixItems };
+              data['CREAOS'].board = { items: creaosItems };
+            } catch (e) { console.log(`Paribali board query failed: ${e.message}`); }
+
+            const fs = require('fs');
+            fs.writeFileSync('holding-data.json', JSON.stringify(data, null, 2));
+            core.setOutput('data', 'collected');
+            console.log('Data collected for all repos');
+
+      - name: Upload data artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: holding-data
+          path: holding-data.json
+          retention-days: 1
+
+  analyze:
+    needs: gather
+    runs-on: ubuntu-latest
+    outputs:
+      report: ${{ steps.claude.outputs.result }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download data artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: holding-data
+
+      - name: Generate cockpit report with Claude
+        id: claude
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          github_token: ${{ secrets.GH_PAT }}
+          show_full_output: true
+          prompt: |
+            You are the Executive Cockpit agent for Paribali Holding.
+
+            Read the agent prompt for your full instructions:
+            cat agents/holding/prompts/executive-cockpit.md
+
+            Read the collected data:
+            cat holding-data.json
+
+            Using this data, generate the Executive Cockpit report following the exact Slack mrkdwn format specified in your prompt.
+
+            IMPORTANT:
+            - Use the ACTUAL data from holding-data.json. Do not make up numbers.
+            - Focus percentages must sum to 100%.
+            - Estimate AI cost from workflow runs (nightly ~15 turns x $0.05, digest ~5 turns x $0.05).
+            - Be honest about what should be paused.
+            - Write the final report to a file called cockpit-report.txt (Slack mrkdwn format).
+            - Also write a GitHub markdown version to cockpit-report-github.md.
+          claude_args: |
+            --max-turns 25
+            --allowedTools Read,Glob,Grep,Bash(gh issue list:gh api:curl:cat:echo)
+
+      - name: Upload report artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cockpit-report
+          path: |
+            cockpit-report.txt
+            cockpit-report-github.md
+          retention-days: 7
+
+  report:
+    needs: [gather, analyze]
+    if: always() && needs.gather.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download report artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: cockpit-report
+        continue-on-error: true
+
+      - name: Post to GitHub issue #1
+        uses: actions/github-script@v8
+        with:
+          github-token: ${{ secrets.GH_PAT }}
+          script: |
+            const fs = require('fs');
+            let body = '## Executive Cockpit — Holding Briefing\n\n';
+
+            try {
+              body = fs.readFileSync('cockpit-report-github.md', 'utf8');
+            } catch (e) {
+              body += '_Report generation failed. Check workflow run for details._\n';
+              body += `\n[View workflow run](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})`;
+            }
+
+            const brtDate = new Date().toLocaleDateString('pt-BR', {
+              timeZone: 'America/Sao_Paulo',
+              weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+            });
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: 1,
+              body: `# Executive Cockpit — ${brtDate}\n\n${body}`
+            });
+
+      - name: Post to Slack
+        if: always()
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          if [ -z "$SLACK_WEBHOOK_URL" ]; then
+            echo "::warning::SLACK_WEBHOOK_URL not set — skipping Slack post"
+            exit 0
+          fi
+
+          REPORT=""
+          if [ -f cockpit-report.txt ]; then
+            REPORT=$(cat cockpit-report.txt)
+          else
+            REPORT="Executive Cockpit report generation failed. Check GitHub Actions."
+          fi
+
+          # Escape for JSON
+          REPORT_ESCAPED=$(echo "$REPORT" | python3 -c 'import sys,json; print(json.dumps(sys.stdin.read()))')
+
+          PAYLOAD=$(cat <<EOF
+          {
+            "text": "PARIBALI HOLDING — Executive Cockpit",
+            "blocks": [
+              {
+                "type": "section",
+                "text": {
+                  "type": "mrkdwn",
+                  "text": ${REPORT_ESCAPED}
+                }
+              }
+            ]
+          }
+          EOF
+          )
+
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$SLACK_WEBHOOK_URL" \
+            -H 'Content-Type: application/json' \
+            -d "$PAYLOAD")
+
+          HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+          BODY=$(echo "$RESPONSE" | head -1)
+          echo "Slack response: $HTTP_CODE — $BODY"
+
+          if [ "$BODY" != "ok" ]; then
+            echo "::warning::Slack delivery failed: $BODY"
+          fi
+
+      - name: Write step summary
+        if: always()
+        run: |
+          if [ -f cockpit-report-github.md ]; then
+            cat cockpit-report-github.md >> $GITHUB_STEP_SUMMARY
+          else
+            echo "## Executive Cockpit" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Report generation failed. Check workflow logs." >> $GITHUB_STEP_SUMMARY
+          fi

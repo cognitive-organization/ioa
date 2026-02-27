@@ -1,0 +1,250 @@
+name: Focus Guardian — Dispersion Detector
+
+on:
+  schedule:
+    # 06:30 BRT = 09:30 UTC, weekdays only (30 min after cockpit)
+    - cron: '30 9 * * 1-5'
+  workflow_dispatch:
+
+concurrency:
+  group: focus-guardian
+  cancel-in-progress: true
+
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Collect board and activity data
+        id: collect
+        uses: actions/github-script@v8
+        with:
+          github-token: ${{ secrets.GH_PAT }}
+          script: |
+            const fs = require('fs');
+            const now = new Date();
+            const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+            const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+            const since24h = yesterday.toISOString();
+            const since7d = sevenDaysAgo.toISOString();
+
+            const repos = [
+              { full: 'paribali-labs/finanfix', alias: 'FINANFIX' },
+              { full: 'paribali-labs/creator-copilot', alias: 'CREAOS' },
+              { full: 'cognitive-organization/ioa', alias: 'IOA' }
+            ];
+
+            const data = { repos: {}, boards: {} };
+
+            // Collect commits and issue stats per repo
+            for (const r of repos) {
+              const [owner, repo] = r.full.split('/');
+              const repoData = { commits24h: 0, issuesCreated7d: 0, issuesClosed7d: 0 };
+
+              try {
+                const { data: commits } = await github.rest.repos.listCommits({
+                  owner, repo, since: since24h, per_page: 30
+                });
+                repoData.commits24h = commits.length;
+              } catch (e) { /* no commits */ }
+
+              try {
+                const { data: issues } = await github.rest.issues.listForRepo({
+                  owner, repo, state: 'all', since: since7d, sort: 'updated', per_page: 100
+                });
+                const realIssues = issues.filter(i => !i.pull_request);
+                repoData.issuesCreated7d = realIssues.filter(i => new Date(i.created_at) > sevenDaysAgo).length;
+                repoData.issuesClosed7d = realIssues.filter(i => i.closed_at && new Date(i.closed_at) > sevenDaysAgo).length;
+              } catch (e) { /* no issues */ }
+
+              data.repos[r.alias] = repoData;
+            }
+
+            // Query IOA board (org-owned)
+            try {
+              const result = await github.graphql(`
+                query($owner: String!, $number: Int!) {
+                  organization(login: $owner) {
+                    projectV2(number: $number) {
+                      items(first: 100) {
+                        nodes {
+                          fieldValues(first: 10) {
+                            nodes {
+                              ... on ProjectV2ItemFieldSingleSelectValue {
+                                name
+                                field { ... on ProjectV2SingleSelectField { name } }
+                              }
+                            }
+                          }
+                          content {
+                            ... on Issue { number title state }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              `, { owner: 'cognitive-organization', number: 1 });
+
+              data.boards['IOA'] = result.organization.projectV2.items.nodes
+                .filter(n => n.content && n.content.state === 'OPEN')
+                .map(n => {
+                  const status = n.fieldValues.nodes.find(f => f.field && f.field.name === 'Status');
+                  return { number: n.content.number, title: n.content.title, status: status ? status.name : 'Unknown' };
+                });
+            } catch (e) { console.log(`IOA board: ${e.message}`); data.boards['IOA'] = []; }
+
+            // Query Paribali board (user-owned)
+            try {
+              const result = await github.graphql(`
+                query($owner: String!, $number: Int!) {
+                  user(login: $owner) {
+                    projectV2(number: $number) {
+                      items(first: 100) {
+                        nodes {
+                          fieldValues(first: 10) {
+                            nodes {
+                              ... on ProjectV2ItemFieldSingleSelectValue {
+                                name
+                                field { ... on ProjectV2SingleSelectField { name } }
+                              }
+                            }
+                          }
+                          content {
+                            ... on Issue {
+                              number title state
+                              repository { nameWithOwner }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              `, { owner: 'paribali', number: 2 });
+
+              const allItems = result.user.projectV2.items.nodes
+                .filter(n => n.content && n.content.state === 'OPEN')
+                .map(n => {
+                  const status = n.fieldValues.nodes.find(f => f.field && f.field.name === 'Status');
+                  return {
+                    number: n.content.number,
+                    title: n.content.title,
+                    repo: n.content.repository ? n.content.repository.nameWithOwner : '',
+                    status: status ? status.name : 'Unknown'
+                  };
+                });
+
+              data.boards['FINANFIX'] = allItems.filter(i => i.repo === 'paribali-labs/finanfix');
+              data.boards['CREAOS'] = allItems.filter(i => i.repo === 'paribali-labs/creator-copilot');
+            } catch (e) {
+              console.log(`Paribali board: ${e.message}`);
+              data.boards['FINANFIX'] = [];
+              data.boards['CREAOS'] = [];
+            }
+
+            fs.writeFileSync('focus-data.json', JSON.stringify(data, null, 2));
+            core.setOutput('data', 'collected');
+
+      - name: Analyze with Claude
+        id: claude
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          github_token: ${{ secrets.GH_PAT }}
+          show_full_output: true
+          prompt: |
+            You are the Focus Guardian agent for Paribali Holding.
+
+            Read your full instructions:
+            cat agents/holding/prompts/focus-guardian.md
+
+            Read the collected data:
+            cat focus-data.json
+
+            Analyze the data and apply ALL detection rules from your prompt.
+            Determine the overall status: GREEN, YELLOW, or RED.
+
+            Write the Slack report to focus-report.txt (mrkdwn format).
+            Write the status (GREEN, YELLOW, or RED) to focus-status.txt (just the word, nothing else).
+            Write a GitHub markdown version to focus-report-github.md.
+          claude_args: |
+            --max-turns 20
+            --allowedTools Read,Glob,Grep,Bash(gh issue list:gh api:cat:echo)
+
+      - name: Post to Slack (YELLOW/RED only)
+        if: always()
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          if [ -z "$SLACK_WEBHOOK_URL" ]; then
+            echo "::warning::SLACK_WEBHOOK_URL not set — skipping Slack"
+            exit 0
+          fi
+
+          STATUS="UNKNOWN"
+          if [ -f focus-status.txt ]; then
+            STATUS=$(cat focus-status.txt | tr -d '[:space:]')
+          fi
+
+          echo "Focus Guardian status: $STATUS"
+
+          if [ "$STATUS" = "GREEN" ]; then
+            echo "Status is GREEN — skipping Slack notification"
+            exit 0
+          fi
+
+          REPORT=""
+          if [ -f focus-report.txt ]; then
+            REPORT=$(cat focus-report.txt)
+          else
+            REPORT="Focus Guardian analysis failed. Check GitHub Actions."
+          fi
+
+          REPORT_ESCAPED=$(echo "$REPORT" | python3 -c 'import sys,json; print(json.dumps(sys.stdin.read()))')
+
+          EMOJI=":large_yellow_circle:"
+          if [ "$STATUS" = "RED" ]; then
+            EMOJI=":red_circle:"
+          fi
+
+          PAYLOAD=$(cat <<EOF
+          {
+            "text": "${EMOJI} Focus Guardian — ${STATUS}",
+            "blocks": [
+              {
+                "type": "section",
+                "text": {
+                  "type": "mrkdwn",
+                  "text": ${REPORT_ESCAPED}
+                }
+              }
+            ]
+          }
+          EOF
+          )
+
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$SLACK_WEBHOOK_URL" \
+            -H 'Content-Type: application/json' \
+            -d "$PAYLOAD")
+
+          HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+          BODY=$(echo "$RESPONSE" | head -1)
+          echo "Slack response: $HTTP_CODE — $BODY"
+
+      - name: Write step summary
+        if: always()
+        run: |
+          if [ -f focus-report-github.md ]; then
+            cat focus-report-github.md >> $GITHUB_STEP_SUMMARY
+          else
+            echo "## Focus Guardian" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Analysis failed. Check workflow logs." >> $GITHUB_STEP_SUMMARY
+          fi

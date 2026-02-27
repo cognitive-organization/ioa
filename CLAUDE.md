@@ -40,3 +40,41 @@
 - Nightly Agent: `.github/workflows/nightly-agent.yml` (22:00 BRT, processes Tonight queue via Claude Code Action)
 - Daily Digest: `.github/workflows/daily-digest.yml` (06:00 BRT weekdays, posts to issue #1 + Slack)
 - Secrets: ANTHROPIC_API_KEY, GH_PAT, SLACK_WEBHOOK_URL (optional)
+
+## Holding Brain (Paribali Holding)
+
+IOA serves dual purpose: (1) open-source standard for AI-native orgs, (2) Paribali Holding brain.
+
+### Holding Agents
+- `agents/holding/prompts/executive-cockpit.md` — Daily unified CEO briefing (06:00 BRT)
+- `agents/holding/prompts/focus-guardian.md` — Dispersion detection (06:30 BRT)
+- `agents/holding/prompts/portfolio-manager.md` — Cross-project operational health (06:15 BRT)
+- `agents/holding/prompts/decision-ledger.md` — Forensic decision capture (23:00 BRT)
+
+### Holding Workflows
+- `.github/workflows/executive-cockpit.yml`
+- `.github/workflows/focus-guardian.yml`
+- `.github/workflows/portfolio-report.yml`
+- `.github/workflows/decision-ledger.yml`
+
+### Memory
+- `memory/decisions/` — Monthly decision records
+- `memory/patterns/` — Cross-project patterns
+- `memory/failures/` — Failure archive
+
+### Repos Under Governance
+- paribali-labs/finanfix (domain: fintech)
+- paribali-labs/creator-copilot (domain: creator economy)
+- cognitive-organization/ioa (domain: AI-native standard)
+
+### Hierarchy
+```
+IOA Core (holding brain)
+    ↓
+Domain Instances (finanfix, creaos, ioa-library)
+    ↓
+Execution Systems (nightly-builder, pr-reviewer, etc.)
+```
+
+Domain agents report UP. Holding agents push focus DOWN.
+No holding-level agents may exist outside this repo.
