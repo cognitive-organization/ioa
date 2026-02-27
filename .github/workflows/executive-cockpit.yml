@@ -296,27 +296,15 @@ jobs:
           if [ -f cockpit-report.txt ]; then
             REPORT=$(cat cockpit-report.txt)
           else
-            REPORT="Executive Cockpit report generation failed. Check GitHub Actions."
+            REPORT="Executive Cockpit report generation failed. Check GitHub Actions: https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
           fi
 
-          # Escape for JSON
-          REPORT_ESCAPED=$(echo "$REPORT" | python3 -c 'import sys,json; print(json.dumps(sys.stdin.read()))')
-
-          PAYLOAD=$(cat <<EOF
-          {
-            "text": "PARIBALI HOLDING — Executive Cockpit",
-            "blocks": [
-              {
-                "type": "section",
-                "text": {
-                  "type": "mrkdwn",
-                  "text": ${REPORT_ESCAPED}
-                }
-              }
-            ]
-          }
-          EOF
-          )
+          # Send as plain text (supports mrkdwn, no 3000 char block limit)
+          PAYLOAD=$(python3 -c "
+          import sys, json
+          report = open('cockpit-report.txt', 'r').read() if __import__('os').path.exists('cockpit-report.txt') else '$REPORT'
+          print(json.dumps({'text': report}))
+          ")
 
           RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$SLACK_WEBHOOK_URL" \
             -H 'Content-Type: application/json' \
@@ -324,7 +312,7 @@ jobs:
 
           HTTP_CODE=$(echo "$RESPONSE" | tail -1)
           BODY=$(echo "$RESPONSE" | head -1)
-          echo "Slack response: $HTTP_CODE — $BODY"
+          echo "Slack response: $HTTP_CODE - $BODY"
 
           if [ "$BODY" != "ok" ]; then
             echo "::warning::Slack delivery failed: $BODY"
