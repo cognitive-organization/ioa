@@ -200,35 +200,22 @@ jobs:
             exit 0
           fi
 
-          REPORT=""
-          if [ -f focus-report.txt ]; then
-            REPORT=$(cat focus-report.txt)
-          else
-            REPORT="Focus Guardian analysis failed. Check GitHub Actions."
-          fi
-
-          REPORT_ESCAPED=$(echo "$REPORT" | python3 -c 'import sys,json; print(json.dumps(sys.stdin.read()))')
-
           EMOJI=":large_yellow_circle:"
           if [ "$STATUS" = "RED" ]; then
             EMOJI=":red_circle:"
           fi
 
-          PAYLOAD=$(cat <<EOF
-          {
-            "text": "${EMOJI} Focus Guardian — ${STATUS}",
-            "blocks": [
-              {
-                "type": "section",
-                "text": {
-                  "type": "mrkdwn",
-                  "text": ${REPORT_ESCAPED}
-                }
-              }
-            ]
-          }
-          EOF
-          )
+          if [ -f focus-report.txt ]; then
+            PAYLOAD=$(python3 -c "
+import json
+emoji = '${EMOJI}'
+status = '${STATUS}'
+report = open('focus-report.txt', 'r').read()
+print(json.dumps({'text': f'{emoji} Focus Guardian — {status}\n\n{report}'}))
+")
+          else
+            PAYLOAD='{"text":"Focus Guardian analysis failed. Check GitHub Actions."}'
+          fi
 
           RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$SLACK_WEBHOOK_URL" \
             -H 'Content-Type: application/json' \

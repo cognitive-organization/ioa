@@ -292,19 +292,15 @@ jobs:
             exit 0
           fi
 
-          REPORT=""
           if [ -f cockpit-report.txt ]; then
-            REPORT=$(cat cockpit-report.txt)
+            PAYLOAD=$(python3 -c "
+import json, sys
+report = open('cockpit-report.txt', 'r').read()
+print(json.dumps({'text': report}))
+")
           else
-            REPORT="Executive Cockpit report generation failed. Check GitHub Actions: https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+            PAYLOAD='{"text":"Executive Cockpit report generation failed. Check GitHub Actions."}'
           fi
-
-          # Send as plain text (supports mrkdwn, no 3000 char block limit)
-          PAYLOAD=$(python3 -c "
-          import sys, json
-          report = open('cockpit-report.txt', 'r').read() if __import__('os').path.exists('cockpit-report.txt') else '$REPORT'
-          print(json.dumps({'text': report}))
-          ")
 
           RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$SLACK_WEBHOOK_URL" \
             -H 'Content-Type: application/json' \

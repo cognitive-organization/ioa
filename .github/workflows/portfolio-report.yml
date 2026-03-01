@@ -267,30 +267,15 @@ jobs:
             exit 0
           fi
 
-          REPORT=""
           if [ -f portfolio-report.txt ]; then
-            REPORT=$(cat portfolio-report.txt)
+            PAYLOAD=$(python3 -c "
+import json
+report = open('portfolio-report.txt', 'r').read()
+print(json.dumps({'text': report}))
+")
           else
-            REPORT="Portfolio Manager report generation failed. Check GitHub Actions."
+            PAYLOAD='{"text":"Portfolio Manager report generation failed. Check GitHub Actions."}'
           fi
-
-          REPORT_ESCAPED=$(echo "$REPORT" | python3 -c 'import sys,json; print(json.dumps(sys.stdin.read()))')
-
-          PAYLOAD=$(cat <<EOF
-          {
-            "text": "Portfolio Manager — Operational Health",
-            "blocks": [
-              {
-                "type": "section",
-                "text": {
-                  "type": "mrkdwn",
-                  "text": ${REPORT_ESCAPED}
-                }
-              }
-            ]
-          }
-          EOF
-          )
 
           RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$SLACK_WEBHOOK_URL" \
             -H 'Content-Type: application/json' \
