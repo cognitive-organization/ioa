@@ -206,13 +206,7 @@ jobs:
           fi
 
           if [ -f focus-report.txt ]; then
-            PAYLOAD=$(python3 -c "
-import json
-emoji = '${EMOJI}'
-status = '${STATUS}'
-report = open('focus-report.txt', 'r').read()
-print(json.dumps({'text': f'{emoji} Focus Guardian — {status}\n\n{report}'}))
-")
+            PAYLOAD=$(python3 -c "import json, os; emoji='${EMOJI}'; status='${STATUS}'; report=open('focus-report.txt','r').read(); print(json.dumps({'text': f'{emoji} Focus Guardian -- {status}\n\n{report}'}))")
           else
             PAYLOAD='{"text":"Focus Guardian analysis failed. Check GitHub Actions."}'
           fi

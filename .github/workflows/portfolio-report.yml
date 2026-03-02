@@ -268,11 +268,7 @@ jobs:
           fi
 
           if [ -f portfolio-report.txt ]; then
-            PAYLOAD=$(python3 -c "
-import json
-report = open('portfolio-report.txt', 'r').read()
-print(json.dumps({'text': report}))
-")
+            PAYLOAD=$(python3 -c 'import json; report = open("portfolio-report.txt", "r").read(); print(json.dumps({"text": report}))')
           else
             PAYLOAD='{"text":"Portfolio Manager report generation failed. Check GitHub Actions."}'
           fi
